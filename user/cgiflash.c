@@ -22,8 +22,10 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
 // Check that the header of the firmware blob looks like actual firmware...
 static char* ICACHE_FLASH_ATTR check_header(void *buf) {
 	uint8_t *cd = (uint8_t *)buf;
+	uint32_t *buf32 = buf;
+	os_printf("%p: %08lX %08lX %08lX %08lX\n", buf, buf32[0], buf32[1], buf32[2], buf32[3]);
 	if (cd[0] != 0xEA) return "IROM magic missing";
-	if (cd[1] != 4 || cd[2] > 3 || cd[3] > 0x40) return "bad flash header";
+	if (cd[1] != 4 || cd[2] > 3 || (cd[3]>>4) > 6) return "bad flash header";
 	if (((uint16_t *)buf)[3] != 0x4010) return "Invalid entry addr";
 	if (((uint32_t *)buf)[2] != 0) return "Invalid start offset";
 	return NULL;
@@ -55,10 +57,7 @@ int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 
 //===== Cgi to query which firmware needs to be uploaded next
 int ICACHE_FLASH_ATTR cgiGetFirmwareNext(HttpdConnData *connData) {
-	if (connData->conn==NULL) {
-		//Connection aborted. Clean up.
-		return HTTPD_CGI_DONE;
-	}
+	if (connData->conn==NULL) return HTTPD_CGI_DONE; // Connection aborted. Clean up.
 
 	uint8 id = system_upgrade_userbin_check();
 	httpdStartResponse(connData, 200);
@@ -74,10 +73,7 @@ int ICACHE_FLASH_ATTR cgiGetFirmwareNext(HttpdConnData *connData) {
 
 //===== Cgi that allows the firmware to be replaced via http POST
 int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
-	if (connData->conn==NULL) {
-		//Connection aborted. Clean up.
-		return HTTPD_CGI_DONE;
-	}
+	if (connData->conn==NULL) return HTTPD_CGI_DONE; // Connection aborted. Clean up.
 
 	int offset = connData->post->received - connData->post->buffLen;
 	if (offset == 0) {
@@ -94,6 +90,8 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	// check overall size
 	//os_printf("FW: %d (max %d)\n", connData->post->len, FIRMWARE_SIZE);
 	if (connData->post->len > FIRMWARE_SIZE) err = "Firmware image too large";
+	if (connData->post->buff == NULL || connData->requestType != HTTPD_METHOD_POST ||
+			connData->post->len < 1024) err = "Invalid request";
 
 	// check that data starts with an appropriate header
 	if (err == NULL && offset == 0) err = check_header(connData->post->buff);
@@ -147,10 +145,7 @@ static ETSTimer flash_reboot_timer;
 
 // Handle request to reboot into the new firmware
 int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
-	if (connData->conn==NULL) {
-		//Connection aborted. Clean up.
-		return HTTPD_CGI_DONE;
-	}
+	if (connData->conn==NULL) return HTTPD_CGI_DONE; // Connection aborted. Clean up.
 
 	// sanity-check that the 'next' partition actually contains something that looks like
 	// valid firmware
@@ -158,6 +153,7 @@ int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
 	int address = id == 1 ? 4*1024                   // either start after 4KB boot partition
 	    : 4*1024 + FIRMWARE_SIZE + 16*1024 + 4*1024; // 4KB boot, fw1, 16KB user param, 4KB reserved
 	uint32 buf[8];
+	os_printf("Checking %p\n", (void *)address);
 	spi_flash_read(address, buf, sizeof(buf));
 	char *err = check_header(buf);
 	if (err != NULL) {

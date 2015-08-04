@@ -16,6 +16,7 @@
 #include "cgi.h"
 #include "cgiwifi.h"
 #include "cgipins.h"
+#include "cgitcp.h"
 #include "cgiflash.h"
 #include "auth.h"
 #include "espfs.h"
@@ -88,6 +89,7 @@ HttpdBuiltInUrl builtInUrls[]={
 	{"/wifi/setmode", cgiWiFiSetMode, NULL},
 	{"/wifi/special", cgiWiFiSpecial, NULL},
 	{"/pins", cgiPins, NULL},
+	{"/tcpclient", cgiTcp, NULL},
 
 	{"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
 	{NULL, NULL, NULL}
@@ -138,8 +140,9 @@ void user_init(void) {
 	// Wifi
 	wifiInit();
 	// init the flash filesystem with the html stuff
-	EspFsInitResult res = espFsInit(&_binary_espfs_img_start);
-	os_printf("espFsInit %s\n", res?"ERR":"ok");
+	espFsInit(&_binary_espfs_img_start);
+	//EspFsInitResult res = espFsInit(&_binary_espfs_img_start);
+	//os_printf("espFsInit %s\n", res?"ERR":"ok");
 	// mount the http handlers
 	httpdInit(builtInUrls, 80);
 	// init the wifi-serial transparent bridge (port 23)
@@ -156,6 +159,7 @@ void user_init(void) {
 	os_printf("exccause=%d epc1=0x%x epc2=0x%x epc3=0x%x excvaddr=0x%x depc=0x%x\n",
 			rst_info->exccause, rst_info->epc1, rst_info->epc2, rst_info->epc3,
 			rst_info->excvaddr, rst_info->depc);
+	os_printf("Flash map %d, chip %08X\n", system_get_flash_size_map(), spi_flash_get_id());
 
 	os_printf("** esp-link ready\n");
 }
