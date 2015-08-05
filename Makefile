@@ -12,6 +12,8 @@
 # Original from esphttpd and others...
 
 # --------------- toolchain configuration ---------------
+# specify which SDK to use
+SDK_VERSION ?= esp_iot_sdk_v1.2.0
 
 # Base directory for the compiler. Needs a / at the end.
 # Typically you'll install https://github.com/pfalcon/esp-open-sdk
@@ -19,18 +21,19 @@ XTENSA_TOOLS_ROOT ?= $(abspath ../esp-open-sdk/xtensa-lx106-elf/bin)/
 
 # Base directory of the ESP8266 SDK package, absolute
 # Typically you'll download from Espressif's BBS, http://bbs.espressif.com/viewforum.php?f=5
-SDK_BASE	?= $(abspath ../esp_iot_sdk_v1.2.0)
+# We simply point to the SDK already in esp-open-sdk
+SDK_BASE	?= $(abspath ../$(SDK_VERSION))
 
 # Esptool.py path and port, only used for 1-time serial flashing
 # Typically you'll use https://github.com/themadinventor/esptool
 ESPTOOL		?= $(abspath ../esp-open-sdk/esptool/esptool.py)
-ESPPORT		?= /dev/ttyUSB0
-ESPBAUD		?= 460800
+ESPPORT		?= /dev/esp8266
+ESPBAUD		?= 115200
 
 # --------------- chipset configuration   ---------------
 
 # Pick your flash size: "512KB" or "4MB"
-FLASH_SIZE ?= 4MB
+FLASH_SIZE ?= 512KB
 
 ifeq ("$(FLASH_SIZE)","512KB")
 # Winbond 25Q40 512KB flash, typ for esp-01 thru esp-11
@@ -52,7 +55,7 @@ ESP_FLASH_MAX       ?= 503808  # max bin file for 512KB flash partition: 492KB
 endif
 
 # hostname or IP address for wifi flashing
-ESP_HOSTNAME        ?= esp-link
+ESP_HOSTNAME        ?= ems-esp-link
 
 # The pin assignments below are used when the settings in flash are invalid, they
 # can be changed via the web interface
