@@ -13,8 +13,8 @@ FlashConfig flashConfig;
 FlashConfig flashDefault = {
   33, 0, 0,
   MCU_RESET_PIN, MCU_ISP_PIN, LED_CONN_PIN, LED_SERIAL_PIN,
-  115200,
-  "esp-link\0                       ", // hostname
+  9600,
+  "ems-esp-link\0                   ", // hostname
   0, 0x00ffffff, 0,                    // static ip, netmask, gateway
   0,                                   // log mode
   0,                                   // swap_uart

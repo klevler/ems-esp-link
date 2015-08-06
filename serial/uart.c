@@ -76,21 +76,19 @@ uart_config(uint8 uart_no)
   CLEAR_PERI_REG_MASK(UART_CONF0(uart_no), UART_RXFIFO_RST | UART_TXFIFO_RST);
 
   if (uart_no == UART0) {
-    // Configure RX interrupt conditions as follows: trigger rx-full when there are 80 characters
-    // in the buffer, trigger rx-timeout when the fifo is non-empty and nothing further has been
-    // received for 4 character periods.
-    // Set the hardware flow-control to trigger when the FIFO holds 100 characters, although
-    // we don't really expect the signals to actually be wired up to anything. It doesn't hurt
-    // to set the threshold here...
+    // Configure RX interrupt conditions as follows:
+    //    trigger rx-full when there are 32 characters in the buffer
+    //    trigger rx-timeout when the fifo is non-empty and nothing further
+    //      has been received for 2 character periods.
+    //    trigger rx-brk
+    // no hardware flow-control
     // We do not enable framing error interrupts 'cause they tend to cause an interrupt avalanche
     // and instead just poll for them when we get a std RX interrupt.
     WRITE_PERI_REG(UART_CONF1(uart_no),
-                   ((80 & UART_RXFIFO_FULL_THRHD) << UART_RXFIFO_FULL_THRHD_S) |
-                   ((100 & UART_RX_FLOW_THRHD) << UART_RX_FLOW_THRHD_S) |
-                   UART_RX_FLOW_EN |
-                   (4 & UART_RX_TOUT_THRHD) << UART_RX_TOUT_THRHD_S |
+                   ((64 & UART_RXFIFO_FULL_THRHD) << UART_RXFIFO_FULL_THRHD_S) |
+                   (2 & UART_RX_TOUT_THRHD) << UART_RX_TOUT_THRHD_S |
                    UART_RX_TOUT_EN);
-    SET_PERI_REG_MASK(UART_INT_ENA(uart_no), UART_RXFIFO_FULL_INT_ENA | UART_RXFIFO_TOUT_INT_ENA);
+    SET_PERI_REG_MASK(UART_INT_ENA(uart_no), UART_RXFIFO_FULL_INT_ENA | UART_RXFIFO_TOUT_INT_ENA | UART_BRK_DET_INT_ENA);
   } else {
     WRITE_PERI_REG(UART_CONF1(uart_no),
                    ((UartDev.rcv_buff.TrigLvl & UART_RXFIFO_FULL_THRHD) << UART_RXFIFO_FULL_THRHD_S));
@@ -127,13 +125,11 @@ uart_tx_one_char(uint8 uart, uint8 c)
 void ICACHE_FLASH_ATTR
 uart1_write_char(char c)
 {
-  //if (c == '\n') uart_tx_one_char(UART1, '\r');
   uart_tx_one_char(UART1, c);
 }
 void ICACHE_FLASH_ATTR
 uart0_write_char(char c)
 {
-  //if (c == '\n') uart_tx_one_char(UART0, '\r');
   uart_tx_one_char(UART0, c);
 }
 /******************************************************************************
@@ -170,7 +166,27 @@ uart0_sendStr(const char *str)
   }
 }
 
-static uint32 last_frm_err; // time in us when last framing error message was printed
+/******************************************************************************
+ * FunctionName : uart0_sendBrk
+ * Description  : send a BRK on uart0
+ *                callee must ensure that Tx FIFO is already empty and that
+ *                BRK detect interrupt is enabled!
+ * Parameters   : NONE
+ * Returns      : NONE
+*******************************************************************************/
+void ICACHE_FLASH_ATTR
+uart0_sendBrk(void)
+{
+    SET_PERI_REG_MASK(UART_CONF0(UART0), UART_TXFIFO_RST);    // clear TxFIFO
+    CLEAR_PERI_REG_MASK(UART_CONF0(UART0), UART_TXFIFO_RST);
+
+    // To create a 1 char break we enable Loopback.
+    // As soon as we get notified in RxIntrHandler about BRK detection we
+    // will disable the loopback and unset the TXD_BRK
+    SET_PERI_REG_MASK(UART_CONF0(UART0), UART_LOOPBACK);        //enable uart loopback
+    SET_PERI_REG_MASK(UART_CONF0(UART0), UART_TXD_BRK);         //SET BRK BIT
+}
+
 
 /******************************************************************************
  * FunctionName : uart0_rx_intr_handler
@@ -184,27 +200,27 @@ uart0_rx_intr_handler(void *para)
 {
   // we assume that uart1 has interrupts disabled (it uses the same interrupt vector)
   uint8 uart_no = UART0;
-  const uint32 one_sec = 1000000; // one second in usecs
 
+  // framing errors shouldn't happen - therefore we don't handle them...
+#if 0
   // we end up largely ignoring framing errors and we just print a warning every second max
   if (READ_PERI_REG(UART_INT_RAW(uart_no)) & UART_FRM_ERR_INT_RAW) {
-    uint32 now = system_get_time();
-    if (last_frm_err == 0 || (now - last_frm_err) > one_sec) {
-      os_printf("UART framing error (bad baud rate?)\n");
-      last_frm_err = now;
-    }
     // clear rx fifo (apparently this is not optional at this point)
     SET_PERI_REG_MASK(UART_CONF0(uart_no), UART_RXFIFO_RST);
     CLEAR_PERI_REG_MASK(UART_CONF0(uart_no), UART_RXFIFO_RST);
     // reset framing error
-    WRITE_PERI_REG(UART_INT_CLR(UART0), UART_FRM_ERR_INT_CLR);
+    WRITE_PERI_REG(UART_INT_CLR(uart_no), UART_FRM_ERR_INT_CLR);
   // once framing errors are gone for 10 secs we forget about having seen them
-  } else if (last_frm_err != 0 && (system_get_time() - last_frm_err) > 10*one_sec) {
-    last_frm_err = 0;
+  }
+#endif
+
+  // on BRK detection we disable LOOPBACK and TXD_BRK
+  if (UART_BRK_DET_INT_ST == (READ_PERI_REG(UART_INT_ST(uart_no)) & UART_BRK_DET_INT_ST)) {
+    CLEAR_PERI_REG_MASK(UART_CONF0(uart_no), UART_LOOPBACK);       //disable uart loopback
+    CLEAR_PERI_REG_MASK(UART_CONF0(uart_no), UART_TXD_BRK);        //CLEAR BRK BIT
   }
 
-  if (UART_RXFIFO_FULL_INT_ST == (READ_PERI_REG(UART_INT_ST(uart_no)) & UART_RXFIFO_FULL_INT_ST)
-  ||  UART_RXFIFO_TOUT_INT_ST == (READ_PERI_REG(UART_INT_ST(uart_no)) & UART_RXFIFO_TOUT_INT_ST))
+  if ((READ_PERI_REG(UART_INT_ST(uart_no)) & (UART_RXFIFO_FULL_INT_ST|UART_RXFIFO_TOUT_INT_ST|UART_BRK_DET_INT_ST)))
   {
     //os_printf("stat:%02X",*(uint8 *)UART_INT_ENA(uart_no));
     ETS_UART_INTR_DISABLE();
@@ -229,13 +245,20 @@ uart_recvTask(os_event_t *events)
            (length < 128)) {
       buf[length++] = READ_PERI_REG(UART_FIFO(UART0)) & 0xFF;
     }
-    //os_printf("%d ix %d\n", system_get_time(), length);
 
+    if ((READ_PERI_REG(UART_INT_ST(UART0)) & (UART_BRK_DET_INT_ST))){
+      buf[length++] = '[';
+      buf[length++] = 'B';
+      buf[length++] = ']';
+    }
+
+    // os_printf("%d ix %d\n", system_get_time(), length);
     for (int i=0; i<MAX_CB; i++) {
       if (uart_recv_cb[i] != NULL) (uart_recv_cb[i])(buf, length);
     }
   }
-  WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
+  // also CLR the break detect interrupt
+  WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR|UART_BRK_DET_INT_CLR);
   ETS_UART_INTR_ENABLE();
 }
 
@@ -261,11 +284,11 @@ uart_init(UartBautRate uart0_br, UartBautRate uart1_br)
   UartDev.baut_rate = uart1_br;
   uart_config(UART1);
   for (int i=0; i<4; i++) uart_tx_one_char(UART1, '\n');
-  for (int i=0; i<4; i++) uart_tx_one_char(UART0, '\n');
+  // for (int i=0; i<4; i++) uart_tx_one_char(UART0, '\n');     // don't disturb EMS
   ETS_UART_INTR_ENABLE();
 
   // install uart1 putc callback
-  os_install_putc1((void *)uart0_write_char);
+  os_install_putc1((void *)uart1_write_char);
 
   system_os_task(uart_recvTask, recvTaskPrio, recvTaskQueue, recvTaskQueueLen);
 }

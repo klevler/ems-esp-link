@@ -64,8 +64,11 @@ int ICACHE_FLASH_ATTR cgiMenu(HttpdConnData *connData) {
 	httpdEndHeaders(connData);
 	// construct json response
 	os_sprintf(buff,
-			"{\"menu\": [\"Home\", \"/home.html\", \"Wifi\", \"/wifi/wifi.html\","
-			"\"\xC2\xB5" "C Console\", \"/console.html\", \"Debug log\", \"/log.html\" ],\n"
+			"{\"menu\": [\"Home\", \"/home.html\","
+			"\"Wifi\", \"/wifi/wifi.html\","
+			"\"EMS Console\", \"/emsconsole.html\","
+			"\"\xC2\xB5" "C Console\", \"/console.html\","
+			"\"Debug log\", \"/log.html\" ],\n"
 			" \"version\": \"%s\" }", esp_link_version);
 	httpdSend(connData, buff, -1);
 	return HTTPD_CGI_DONE;
