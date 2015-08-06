@@ -257,134 +257,13 @@ serbridgeSentCb(void *arg) {
 	sendtxbuffer(conn); // send possible new data in txbuffer
 }
 
-// TCP client connection state machine
-// This processes commands from the attached uC to open outboud TCP connections
-enum {
-	TC_idle,       // in-between commands
-	TC_newline,    // newline seen
-	TC_start,      // start character (~) seen
-	TC_cmd,        // command start (@) seen
-	TC_cmdChar,    // command character seen
-	TC_cmdLine,    // accumulating command
-	TC_tdchan,     // saw data channel character
-	TC_tdlen1,     // saw first data length character
-	TC_tdata0,     // accumulate data, zero-terminated
-	TC_tdataN,     // accumulate data, length-terminated
-};
-static uint8_t tcState = TC_newline;
-static uint8_t tcChan; // channel for current command (index into tcConn)
-
-#define CMD_MAX 256
-static char tcCmdBuf[CMD_MAX];
-static short tcCmdBufLen = 0;
-static char tcCmdChar;
-static short tcLen;
-
-// scan a buffer for tcp client commands
-static int ICACHE_FLASH_ATTR
-tcpClientProcess(char *buf, int len)
-{
-	char *in=buf, *out=buf;
-	for (short i=0; i<len; i++) {
-		char c = *in++;
-		//os_printf("tcState=%d c=%c\n", tcState, c);
-		switch (tcState) {
-		case TC_idle:
-			if (c == '\n') tcState = TC_newline;
-			break;
-		case TC_newline: // saw newline, expect ~
-			if (c == '~') tcState = TC_start;
-			continue; // gobble up the ~
-		case TC_start: // saw ~, expect channel number
-			if (c == '@') {
-				tcState = TC_cmd;
-				continue;
-			} else if (c >= '0' && c <= '9') {
-				tcChan = c-'0';
-				tcState = TC_tdchan;
-				continue;
-			}
-			*out++ = '~'; // make up for '~' we skipped
-			break;
-		case TC_cmd: // saw control char (@), expect channel char
-			if (c >= '0' && c <= '9') {
-				tcChan = c-'0';
-				tcState = TC_cmdChar;
-				continue;
-			} else {
-				*out++ = '~'; // make up for '~' we skipped
-				*out++ = '@'; // make up for '@' we skipped
-				break;
-			}
-		case TC_cmdChar: // saw channel number, expect command char
-			tcCmdChar = c;   // save command character
-			tcCmdBufLen = 0; // empty the command buffer
-			tcState = TC_cmdLine;
-			continue;
-		case TC_cmdLine: // accumulating command in buffer
-			if (c != '\n') {
-				if (tcCmdBufLen < CMD_MAX) tcCmdBuf[tcCmdBufLen++] = c;
-			} else {
-				tcpClientCommand(tcChan, tcCmdChar, tcCmdBuf);
-				tcState = TC_newline;
-			}
-			continue;
-		case TC_tdchan: // saw channel number, getting first length char
-			if (c >= '0' && c <= '9') {
-				tcLen = c-'0';
-			} else if (c >= 'A' && c <= 'F') {
-				tcLen = c-'A'+10;
-			} else {
-				*out++ = '~'; // make up for '~' we skipped
-				*out++ = '0'+tcChan;
-				break;
-			}
-			tcState = TC_tdlen1;
-			continue;
-		case TC_tdlen1: // saw first length char, get second
-			tcLen *= 16;
-			if (c >= '0' && c <= '9') {
-				tcLen += c-'0';
-			} else if (c >= 'A' && c <= 'F') {
-				tcLen += c-'A'+10;
-			} else {
-				*out++ = '~'; // make up for '~' we skipped
-				*out++ = '0'+tcChan;
-				break;
-			}
-			tcState = tcLen == 0 ? TC_tdata0 : TC_tdataN;
-			continue;
-		case TC_tdata0: // saw data length, getting data characters zero-terminated
-			if (c != 0) {
-				tcpClientSendChar(tcChan, c);
-			} else {
-				tcpClientSendPush(tcChan);
-				tcState = TC_idle;
-			}
-			continue;
-		case TC_tdataN: // saw data length, getting data characters length-terminated
-			tcpClientSendChar(tcChan, c);
-			tcLen--;
-			if (tcLen == 0) {
-				tcpClientSendPush(tcChan);
-				tcState = TC_idle;
-			}
-			continue;
-		}
-		*out++ = c;
-	}
-	if (tcState != TC_idle) os_printf("tcState=%d\n", tcState);
-	return out-buf;
-}
-
 // callback with a buffer of characters that have arrived on the uart
 void ICACHE_FLASH_ATTR
 serbridgeUartCb(char *buf, int length) {
 	// push the buffer into the microcontroller console
 	for (int i=0; i<length; i++)
 		console_write_char(buf[i]);
-	// parse the buffer for TCP commands, this may remove characters from the buffer
-	length = tcpClientProcess(buf, length);
+
 	// push the buffer into each open connection
 	if (length > 0) {
 		for (int i = 0; i < MAX_CONN; ++i) {
