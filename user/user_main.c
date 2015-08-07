@@ -27,6 +27,8 @@
 #include "console.h"
 #include "config.h"
 #include "log.h"
+#include "sntp.h"
+#include "ems.h"
 #include <gpio.h>
 
 //#define SHOW_HEAP_USE
@@ -88,7 +90,7 @@ HttpdBuiltInUrl builtInUrls[]={
 	{"/wifi/connstatus", cgiWiFiConnStatus, NULL},
 	{"/wifi/setmode", cgiWiFiSetMode, NULL},
 	{"/wifi/special", cgiWiFiSpecial, NULL},
-	{"/pins", cgiPins, NULL},
+//	{"/pins", cgiPins, NULL},
 	{"/tcpclient", cgiTcp, NULL},
 
 	{"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
@@ -147,6 +149,9 @@ void user_init(void) {
 	httpdInit(builtInUrls, 80);
 	// init the wifi-serial transparent bridge (port 23)
 	serbridgeInit(23);
+	// init EMS interface
+	emsInit();
+
 	uart_add_recv_cb(&serbridgeUartCb);
 #ifdef SHOW_HEAP_USE
 	os_timer_disarm(&prHeapTimer);

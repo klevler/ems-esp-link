@@ -27,15 +27,6 @@ serbridgeConnData connData[MAX_CONN];
 static serbridgeConnData ICACHE_FLASH_ATTR *serbridgeFindConnData(void *arg) {
 	struct espconn *conn = arg;
 	return (serbridgeConnData *)conn->reverse;
-#if 0
-	for (int i=0; i<MAX_CONN; i++) {
-		if (connData[i].conn == (struct espconn *)arg) {
-			return &connData[i];
-		}
-	}
-	//os_printf("FindConnData: Huh? Couldn't find connection for %p\n", arg);
-	return NULL; // not found, may be closed already...
-#endif
 }
 
 //===== TCP -> UART
@@ -137,15 +128,6 @@ telnetUnwrap(uint8_t *inBuf, int len, uint8_t state)
 	return state;
 }
 
-void ICACHE_FLASH_ATTR serbridgeReset() {
-	if (mcu_reset_pin >= 0) {
-		os_printf("MCU reset gpio%d\n", mcu_reset_pin);
-		GPIO_OUTPUT_SET(mcu_reset_pin, 0);
-		os_delay_us(100L);
-		GPIO_OUTPUT_SET(mcu_reset_pin, 1);
-	} else os_printf("MCU reset: no pin\n");
-}
-
 // Receive callback
 static void ICACHE_FLASH_ATTR serbridgeRecvCb(void *arg, char *data, unsigned short len) {
 	serbridgeConnData *conn = serbridgeFindConnData(arg);
@@ -159,31 +141,12 @@ static void ICACHE_FLASH_ATTR serbridgeRecvCb(void *arg, char *data, unsigned sh
 	// if the sender is a person typing (although in that case the line-oriented TTY input seems
 	// to make it work too). If this becomes a problem we need to buffer the first few chars...
 	if (conn->conn_mode == cmInit) {
-
-		// If the connection starts with the Arduino or ARM reset sequence we perform a RESET
-		if ((len == 2 && strncmp(data, "0 ", 2) == 0) ||
-				(len == 2 && strncmp(data, "?\n", 2) == 0) ||
-				(len == 3 && strncmp(data, "?\r\n", 3) == 0)) {
-			os_printf("MCU Reset=%d ISP=%d\n", mcu_reset_pin, mcu_isp_pin);
-			os_delay_us(2*1000L); // time for os_printf to happen
-			// send reset to arduino/ARM
-			if (mcu_reset_pin >= 0) GPIO_OUTPUT_SET(mcu_reset_pin, 0);
-			os_delay_us(100L);
-			if (mcu_isp_pin >= 0) GPIO_OUTPUT_SET(mcu_isp_pin, 0);
-			os_delay_us(100L);
-			if (mcu_reset_pin >= 0) GPIO_OUTPUT_SET(mcu_reset_pin, 1);
-			os_delay_us(100L);
-			if (mcu_isp_pin >= 0) GPIO_OUTPUT_SET(mcu_isp_pin, 1);
-			os_delay_us(1000L);
-			conn->conn_mode = cmAVR;
-
-
 		// If the connection starts with a telnet negotiation we will do telnet
-		} else if (len >= 3 && strncmp(data, (char[]){IAC, WILL, ComPortOpt}, 3) == 0) {
+		if (len >= 3 && strncmp(data, (char[]){IAC, WILL, ComPortOpt}, 3) == 0) {
 			conn->conn_mode = cmTelnet;
 			conn->telnet_state = TN_normal;
 			// note that the three negotiation chars will be gobbled-up by telnetUnwrap
-			os_printf("telnet mode\n");
+			// os_printf("telnet mode\n");
 
 		// looks like a plain-vanilla connection!
 		} else {
@@ -331,36 +294,8 @@ static void ICACHE_FLASH_ATTR serbridgeConnectCb(void *arg) {
 	espconn_set_opt(conn, ESPCONN_REUSEADDR|ESPCONN_NODELAY);
 }
 
-//===== Initialization
-
-void ICACHE_FLASH_ATTR serbridgeInitPins() {
-	mcu_reset_pin = flashConfig.reset_pin;
-	mcu_isp_pin = flashConfig.isp_pin;
-	os_printf("Serbridge pins: reset=%d isp=%d swap=%d\n",
-			mcu_reset_pin, mcu_isp_pin, flashConfig.swap_uart);
-
-	if (flashConfig.swap_uart) {
-		PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTCK_U, 4);
-		PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 4);
-		system_uart_swap();
-	} else {
-		PIN_FUNC_SELECT(PERIPHS_IO_MUX_U0TXD_U, 0);
-		PIN_FUNC_SELECT(PERIPHS_IO_MUX_U0RXD_U, 0);
-		system_uart_de_swap();
-	}
-
-	// set both pins to 1 before turning them on so we don't cause a reset
-	if (mcu_isp_pin >= 0)   GPIO_OUTPUT_SET(mcu_isp_pin, 1);
-	if (mcu_reset_pin >= 0) GPIO_OUTPUT_SET(mcu_reset_pin, 1);
-	// switch pin mux to make these pins GPIO pins
-	if (mcu_reset_pin >= 0) makeGpio(mcu_reset_pin);
-	if (mcu_isp_pin >= 0)   makeGpio(mcu_isp_pin);
-}
-
 // Start transparent serial bridge TCP server on specified port (typ. 23)
 void ICACHE_FLASH_ATTR serbridgeInit(int port) {
-	serbridgeInitPins();
-
 	int i;
 	for (i = 0; i < MAX_CONN; i++) {
 		connData[i].conn = NULL;

@@ -4,8 +4,11 @@
 #include <config.h>
 #include <serled.h>
 
+#if defined __USE_SERLED
 static ETSTimer serledTimer;
+#endif
 
+#if defined __USE_SERLED
 static void ICACHE_FLASH_ATTR setSerled(int on) {
   int8_t pin = flashConfig.ser_led_pin;
   if (pin < 0) return; // disabled
@@ -16,19 +19,25 @@ static void ICACHE_FLASH_ATTR setSerled(int on) {
     gpio_output_set((1<<pin), 0, (1<<pin), 0);
   }
 }
+#endif
 
+#if defined __USE_SERLED
 static void ICACHE_FLASH_ATTR serledTimerCb(void *v) {
   setSerled(0);
 }
+#endif
 
 void ICACHE_FLASH_ATTR serledFlash(int duration) {
+#if defined __USE_SERLED
   setSerled(1);
   os_timer_disarm(&serledTimer);
   os_timer_setfn(&serledTimer, serledTimerCb, NULL);
   os_timer_arm(&serledTimer, duration, 0);
+#endif
 }
 
 void ICACHE_FLASH_ATTR serledInit(void) {
+#if defined __USE_SERLED
   int8_t pin = flashConfig.ser_led_pin;
   if (pin >= 0) {
     makeGpio(pin);
@@ -36,10 +45,12 @@ void ICACHE_FLASH_ATTR serledInit(void) {
     serledFlash(1000); // turn it on for 1 second
   }
 	os_printf("SER led=%d\n", pin);
+#endif
 }
 
 // Make a pin be GPIO, i.e. set the mux so the pin has the gpio function
 void ICACHE_FLASH_ATTR makeGpio(uint8_t pin) {
+#if defined __USE_SERLED
   uint32_t addr;
   uint8_t func = 3;
   switch (pin) {
@@ -83,4 +94,5 @@ void ICACHE_FLASH_ATTR makeGpio(uint8_t pin) {
     return;
   }
   PIN_FUNC_SELECT(addr, func);
+#endif
 }
