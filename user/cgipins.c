@@ -1,4 +1,4 @@
-// #ifdef __USE_CGIPINS
+#if defined __USE_CGIPINS
 #include <esp8266.h>
 #include "cgi.h"
 #include "espfs.h"
@@ -120,4 +120,5 @@ int ICACHE_FLASH_ATTR cgiPins(HttpdConnData *connData) {
 		return HTTPD_CGI_DONE;
 	}
 }
-// #endif
+
+#endif

@@ -54,7 +54,7 @@ ajaxConsoleReset(HttpdConnData *connData) {
 	if (connData->conn==NULL) return HTTPD_CGI_DONE; // Connection aborted. Clean up.
 	jsonHeader(connData, 200);
 	console_rd = console_wr = console_pos = 0;
-	serbridgeReset();
+	// serbridgeReset();
 	return HTTPD_CGI_DONE;
 }
 
