@@ -226,8 +226,11 @@ uart_recvTask(os_event_t *events)
 {
   _EMSRxBuf *p = pEMSRxBuf[emsRxBufIdx];
 
-  if (p->writePtr == 0)
+  if (p->writePtr == 0) {
     p->timeStamp = system_get_time();
+    p->sntp_timeStamp = realtime_stamp;
+   	p->guard = 0xe51a;
+  }
 
   while (READ_PERI_REG(UART_STATUS(UART0)) & (UART_RXFIFO_CNT << UART_RXFIFO_CNT_S)) {
     //WRITE_PERI_REG(0X60000914, 0x73); //WTD // commented out by TvE
