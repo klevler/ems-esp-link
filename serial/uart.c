@@ -203,6 +203,9 @@ uart0_rx_intr_handler(void *para)
   // we assume that uart1 has interrupts disabled (it uses the same interrupt vector)
   uint8 uart_no = UART0;
 
+  // mark EMS Bus busy
+  EMSBusBusy = true;
+
   // on BRK detection we disable LOOPBACK and TXD_BRK
   if (UART_BRK_DET_INT_ST == (READ_PERI_REG(UART_INT_ST(uart_no)) & UART_BRK_DET_INT_ST)) {
     CLEAR_PERI_REG_MASK(UART_CONF0(uart_no), UART_LOOPBACK);       //disable uart loopback
@@ -211,7 +214,6 @@ uart0_rx_intr_handler(void *para)
 
   if ((READ_PERI_REG(UART_INT_ST(uart_no)) & (UART_RXFIFO_FULL_INT_ST|UART_RXFIFO_TOUT_INT_ST|UART_BRK_DET_INT_ST)))
   {
-    //os_printf("stat:%02X",*(uint8 *)UART_INT_ENA(uart_no));
     ETS_UART_INTR_DISABLE();
     system_os_post(recvTaskPrio, 0, 0);
   }
@@ -224,45 +226,44 @@ uart0_rx_intr_handler(void *para)
 static void ICACHE_FLASH_ATTR
 uart_recvTask(os_event_t *events)
 {
-  _EMSRxBuf *p = pEMSRxBuf[emsRxBufIdx];
-
-  if (p->writePtr == 0) {
-    p->timeStamp = system_get_time();
-    p->sntp_timeStamp = realtime_stamp;
-   	p->guard = 0xe51a;
+  if (pEMSRxBuf->writePtr == 0) {
+    pEMSRxBuf->sys_timeStamp = system_get_time();
+    pEMSRxBuf->sntp_timeStamp = realtime_stamp;
   }
 
   while (READ_PERI_REG(UART_STATUS(UART0)) & (UART_RXFIFO_CNT << UART_RXFIFO_CNT_S)) {
-    //WRITE_PERI_REG(0X60000914, 0x73); //WTD // commented out by TvE
-
     // read FIFO from UART
     uint16 length = 0;
     while ((READ_PERI_REG(UART_STATUS(UART0)) & (UART_RXFIFO_CNT << UART_RXFIFO_CNT_S)) &&
            (length < EMS_MAXBUFFERSIZE)) {
-      p->buffer[length++] = READ_PERI_REG(UART_FIFO(UART0)) & 0xFF;
+      pEMSRxBuf->buffer[length++] = READ_PERI_REG(UART_FIFO(UART0)) & 0xFF;
     }
-    p->writePtr = length;
+    pEMSRxBuf->writePtr = length;
   }
 
   // FIFO is empty - check for BRK condition
   if ((READ_PERI_REG(UART_INT_ST(UART0)) & (UART_BRK_DET_INT_ST))){
+    // remember current EMSRxBuf
+    _EMSRxBuf *pCurrent = pEMSRxBuf;
+
     // append marker to end of buffer
-    p->buffer[p->writePtr++] = '[';
-    p->buffer[p->writePtr++] = 'B';
-    p->buffer[p->writePtr++] = ']';
+    pEMSRxBuf->buffer[pEMSRxBuf->writePtr++] = '\xe5';
+    pEMSRxBuf->buffer[pEMSRxBuf->writePtr++] = '\x1a';
 
     // get next free EMS Receive buffer
-    emsRxBufIdx = (emsRxBufIdx + 1) % EMS_MAXBUFFERS;
-    _EMSRxBuf *pTmp = pEMSRxBuf[emsRxBufIdx];
-    pTmp->writePtr = pTmp->readPtr = 0;
+    pEMSRxBuf = paEMSRxBuf[++emsRxBufIdx % EMS_MAXBUFFERS];   // advance to next buffer
+    pEMSRxBuf->writePtr = 0;
 
     // CLR interrupt status, reenable UART interrupt
     WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR|UART_BRK_DET_INT_CLR);
     ETS_UART_INTR_ENABLE();
 
+    // mark EMS bus as free
+    EMSBusBusy = false;
+
     // transmit EMS buffer including header
     for (int i=0; i<MAX_CB; i++) {
-      if (uart_recv_cb[i] != NULL) (uart_recv_cb[i])((char *)p, p->writePtr + sizeof(_EMSRxBuf) - EMS_MAXBUFFERSIZE);
+      if (uart_recv_cb[i] != NULL) (uart_recv_cb[i])((char *)pCurrent, pCurrent->writePtr + sizeof(_EMSRxBuf) - EMS_MAXBUFFERSIZE);
     }
   } else {
     // CLR interrupt status, reenable UART interrupt
@@ -317,6 +318,4 @@ void ICACHE_FLASH_ATTR
 uart_reattach()
 {
   uart_init(BIT_RATE_74880, BIT_RATE_74880);
-//  ETS_UART_INTR_ATTACH(uart_rx_intr_handler_ssc,  &(UartDev.rcv_buff));
-//  ETS_UART_INTR_ENABLE();
 }
