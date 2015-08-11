@@ -67,11 +67,8 @@ HttpdBuiltInUrl builtInUrls[]={
 	{"/flash/next", cgiGetFirmwareNext, NULL},
 	{"/flash/upload", cgiUploadFirmware, NULL},
 	{"/flash/reboot", cgiRebootFirmware, NULL},
-	//{"/home.html", cgiEspFsHtml, NULL},
-	//{"/log.html", cgiEspFsHtml, NULL},
 	{"/log/text", ajaxLog, NULL},
 	{"/log/dbg", ajaxLogDbg, NULL},
-	//{"/console.html", cgiEspFsHtml, NULL},
 	{"/console/reset", ajaxConsoleReset, NULL},
 	{"/console/baud", ajaxConsoleBaud, NULL},
 	{"/console/text", ajaxConsole, NULL},
@@ -90,8 +87,6 @@ HttpdBuiltInUrl builtInUrls[]={
 	{"/wifi/connstatus", cgiWiFiConnStatus, NULL},
 	{"/wifi/setmode", cgiWiFiSetMode, NULL},
 	{"/wifi/special", cgiWiFiSpecial, NULL},
-//	{"/pins", cgiPins, NULL},
-	{"/tcpclient", cgiTcp, NULL},
 
 	{"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
 	{NULL, NULL, NULL}

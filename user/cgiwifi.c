@@ -54,14 +54,12 @@ static void ICACHE_FLASH_ATTR wifiHandleEventCb(System_Event_t *evt) {
 		wifiReason = 0;
 		os_printf("Wifi connected to ssid %s, ch %d\n", evt->event_info.connected.ssid,
 				evt->event_info.connected.channel);
-		statusWifiUpdate(wifiState);
 		break;
 	case EVENT_STAMODE_DISCONNECTED:
 		wifiState = wifiIsDisconnected;
 		wifiReason = evt->event_info.disconnected.reason;
 		os_printf("Wifi disconnected from ssid %s, reason %s (%d)\n",
 				evt->event_info.disconnected.ssid, wifiGetReason(), evt->event_info.disconnected.reason);
-		statusWifiUpdate(wifiState);
 		break;
 	case EVENT_STAMODE_AUTHMODE_CHANGE:
 		os_printf("Wifi auth mode: %d -> %d\n",
@@ -73,7 +71,6 @@ static void ICACHE_FLASH_ATTR wifiHandleEventCb(System_Event_t *evt) {
 		os_printf("Wifi got ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR "\n",
 				IP2STR(&evt->event_info.got_ip.ip), IP2STR(&evt->event_info.got_ip.mask),
 				IP2STR(&evt->event_info.got_ip.gw));
-		statusWifiUpdate(wifiState);
 		break;
 	case EVENT_SOFTAPMODE_STACONNECTED:
 		os_printf("Wifi AP: station " MACSTR " joined, AID = %d\n",

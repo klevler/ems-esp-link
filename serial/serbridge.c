@@ -227,9 +227,16 @@ serbridgeSentCb(void *arg) {
 // callback with a buffer of characters that have arrived on the uart
 void ICACHE_FLASH_ATTR
 serbridgeUartCb(char *buf, int length) {
+	char tmp[4];
 	// push the buffer into the microcontroller console
-	for (int i=0; i<length; i++)
-		console_write_char(buf[i]);
+	for (int i=0; i<length; i++) {
+		// we do a hexdump, so it's easier to debug...
+		os_sprintf(tmp, "%02x", buf[i]);
+		console_write_char(tmp[0]);
+		console_write_char(tmp[1]);
+		console_write_char(' ');
+	}
+	console_write_char('\n');
 
 	// push the buffer into each open connection
 	if (length > 0) {

@@ -1,7 +1,7 @@
 // Copyright 2015 by Thorsten von Eicken, see LICENSE.txt
 // // TCP Client settings
 
-// #ifdef __USE_CGITCP
+#ifdef __USE_CGITCP
 #include <esp8266.h>
 #include "cgi.h"
 #include "config.h"
@@ -73,4 +73,4 @@ int ICACHE_FLASH_ATTR cgiTcp(HttpdConnData *connData) {
     return HTTPD_CGI_DONE;
   }
 }
-// #endif
+#endif
