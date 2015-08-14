@@ -13,7 +13,7 @@
 
 # --------------- toolchain configuration ---------------
 # specify which SDK to use
-SDK_VERSION ?= esp_iot_sdk_v1.2.0
+SDK_VERSION ?= esp_iot_sdk_v1.3.0
 
 # Base directory for the compiler. Needs a / at the end.
 # Typically you'll install https://github.com/pfalcon/esp-open-sdk
