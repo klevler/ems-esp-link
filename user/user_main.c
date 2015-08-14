@@ -122,32 +122,22 @@ void user_init(void) {
 	// get the flash config so we know how to init things
 	//configWipe(); // uncomment to reset the config for testing purposes
 	bool restoreOk = configRestore();
-	// init gpio pin registers
-	gpio_init();
-	// init UART
-	uart_init(flashConfig.baud_rate, 115200);
+
+	gpio_init();	// init gpio pin registers
+	emsInit();		// init EMS interface - before uart_init to allocate buffers
+	uart_init(flashConfig.baud_rate, 115200);	// init UART
 	logInit(); // must come after init of uart
-	// say hello (leave some time to cause break in TX after boot loader's msg
-	os_delay_us(10000L);
+
+	os_delay_us(10000L);	// say hello (leave some time to cause break in TX after boot loader's msg
 	os_printf("\n\n** %s\n", esp_link_version);
 	os_printf("Flash config restore %s\n", restoreOk ? "ok" : "*FAILED*");
-	// Status LEDs
-	statusInit();
-	serledInit();
-	// Wifi
-	wifiInit();
-	// init the flash filesystem with the html stuff
-	espFsInit(&_binary_espfs_img_start);
-	//EspFsInitResult res = espFsInit(&_binary_espfs_img_start);
-	//os_printf("espFsInit %s\n", res?"ERR":"ok");
-	// mount the http handlers
-	httpdInit(builtInUrls, 80);
-	// init the wifi-serial transparent bridge (port 23)
-	serbridgeInit(23);
-	// init EMS interface
-	emsInit();
-
+	statusInit();		// Status LEDs
+	wifiInit();			// Wifi
+	espFsInit(&_binary_espfs_img_start);	// init the flash filesystem with the html stuff
+	httpdInit(builtInUrls, 80);	// mount the http handlers
+	serbridgeInit(23);	// init the wifi-serial transparent bridge (port 23)
 	uart_add_recv_cb(&serbridgeUartCb);
+
 #ifdef SHOW_HEAP_USE
 	os_timer_disarm(&prHeapTimer);
 	os_timer_setfn(&prHeapTimer, prHeapTimerCb, NULL);
@@ -161,5 +151,6 @@ void user_init(void) {
 			rst_info->excvaddr, rst_info->depc);
 	os_printf("Flash map %d, chip %08X\n", system_get_flash_size_map(), spi_flash_get_id());
 
-	os_printf("** esp-link ready\n");
+	os_printf("** activating ems-esp-link\n");
+	EMSInitDone = true;
 }

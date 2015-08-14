@@ -47,6 +47,14 @@ console_write_char(char c) {
 	console_write(c);
 }
 
+void ICACHE_FLASH_ATTR
+console_write_str(char *p) {
+	while (*p)
+		console_write(*p++);
+}
+
+
+
 int ICACHE_FLASH_ATTR
 ajaxConsoleReset(HttpdConnData *connData) {
 	if (connData->conn==NULL) return HTTPD_CGI_DONE; // Connection aborted. Clean up.

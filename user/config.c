@@ -33,10 +33,13 @@ typedef union {
 #define FLASH_SECT   (4096)
 static int flash_pri; // primary flash sector (0 or 1, or -1 for error)
 
-#if 0
-static void memDump(void *addr, int len) {
-  for (int i=0; i<len; i++) {
-    os_printf("0x%02x", ((uint8_t *)addr)[i]);
+#if 1
+void ICACHE_FLASH_ATTR
+memDump(void *addr, int len) {
+  for (int i=0; i<len;) {
+    os_printf("%02x", ((uint8_t *)addr)[i++]);
+    if ((i % 32) == 0)
+      os_printf("\n");
   }
   os_printf("\n");
 }

@@ -9,7 +9,7 @@
 #define SER_BRIDGE_TIMEOUT 28799
 
 //Max send buffer len
-#define MAX_TXBUFFER 1024
+#define MAX_TXBUFFER 1472	// increase to max tcp package size
 
 enum connModes {
 	cmInit = 0,        // initialization mode: nothing received yet

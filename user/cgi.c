@@ -59,7 +59,7 @@ int ICACHE_FLASH_ATTR cgiMenu(HttpdConnData *connData) {
 	char buff[1024];
 	// don't use jsonHeader so the response does get cached
 	httpdStartResponse(connData, 200);
-	httpdHeader(connData, "Cache-Control", "max-age=3600, must-revalidate");
+	httpdHeader(connData, "Cache-Control", "max-age=600, must-revalidate");
 	httpdHeader(connData, "Content-Type", "application/json");
 	httpdEndHeaders(connData);
 	// construct json response
@@ -67,7 +67,7 @@ int ICACHE_FLASH_ATTR cgiMenu(HttpdConnData *connData) {
 			"{\"menu\": [\"Home\", \"/home.html\","
 			"\"Wifi\", \"/wifi/wifi.html\","
 			"\"EMS Console\", \"/emsconsole.html\","
-			"\"\xC2\xB5" "C Console\", \"/console.html\","
+			"\"EMS Debug Log\", \"/console.html\","
 			"\"Debug log\", \"/log.html\" ],\n"
 			" \"version\": \"%s\" }", esp_link_version);
 	httpdSend(connData, buff, -1);

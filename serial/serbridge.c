@@ -29,6 +29,9 @@ static serbridgeConnData ICACHE_FLASH_ATTR *serbridgeFindConnData(void *arg) {
 	return (serbridgeConnData *)conn->reverse;
 }
 
+extern void ICACHE_FLASH_ATTR
+memDump(void *addr, int len);
+
 //===== TCP -> UART
 
 // Telnet protocol characters
@@ -196,7 +199,9 @@ static sint8 ICACHE_FLASH_ATTR sendtxbuffer(serbridgeConnData *conn) {
 // only be called *after* receiving an espconn_sent_callback for the previous packet.
 static sint8 ICACHE_FLASH_ATTR espbuffsend(serbridgeConnData *conn, const char *data, uint16 len) {
 	if (conn->txbufferlen + len > MAX_TXBUFFER) {
-		os_printf("espbuffsend: txbuffer full on conn %p\n", conn);
+		os_printf("espbuffsend: txbuffer[%p:%d] full on conn %p \n", data, len, conn);
+		memDump((void *)conn->txbuffer,conn->txbufferlen);
+		memDump((void *)data, len);
 		return -128;
 	}
 	os_memcpy(conn->txbuffer + conn->txbufferlen, data, len);
