@@ -42,12 +42,14 @@ with a simple web interface, many thanks to Jeroen Domburg for making it availab
 
 Eye Candy
 ---------
-These screen shots show the Home page, the (Wifi) configuration page, the EMS Debug Log page and the EMS-Link debug page.
+These screen shots show the Home page, the (Wifi) configuration page, the EMS Debug Log page and the EMS-Link debug page. 
 
-<img width="45%" src="https://cloud.githubusercontent.com/assets/39480/8261425/6ca395a6-167f-11e5-8e92-77150371135a.png">
-<img width="45%" src="https://cloud.githubusercontent.com/assets/39480/8261427/6caf7326-167f-11e5-8085-bc8b20159b2b.png">
-<img width="45%" src="https://cloud.githubusercontent.com/assets/39480/8261426/6ca7f75e-167f-11e5-827d-9a1c582ad05d.png">
-<img width="30%" src="https://cloud.githubusercontent.com/assets/39480/8261658/11e6c64a-1681-11e5-82d0-ea5ec90a6ddb.png">
+<img width="45%" src="https://github.com/susisstrolch/ems-esp-link/blob/develop/Selection_050.png">
+<img width="45%" src="https://github.com/susisstrolch/ems-esp-link/blob/develop/Selection_051.png">
+<img width="45%" src="https://github.com/susisstrolch/ems-esp-link/blob/develop/Selection_049.png">
+<img width="30%" src="https://github.com/susisstrolch/ems-esp-link/blob/develop/Selection_052.png">
+
+[The Homepage / EMS Status tab is currently a fake, EMS Debug Logs are real.]
 
 Hardware info
 -------------
