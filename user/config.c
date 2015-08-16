@@ -14,12 +14,16 @@ FlashConfig flashDefault = {
   33, 0, 0,
   MCU_RESET_PIN, MCU_ISP_PIN, LED_CONN_PIN, LED_SERIAL_PIN,
   9600,
-  "ems-esp-link\0                   ", // hostname
-  0, 0x00ffffff, 0,                    // static ip, netmask, gateway
-  0,                                   // log mode
-  0,                                   // swap_uart
-  1, 0,                                // tcp_enable, rssi_enable
-  "\0",                                // api_key
+  "ems-link\0                   ", // hostname
+  0, 0x00ffffff, 0,                // static ip, netmask, gateway
+  0,                               // log mode
+  0,                               // swap_uart
+  1, 0,                            // tcp_enable, rssi_enable
+  "\0",                            // api_key
+  "0.europe.pool.ntp.org\0      ", // NTP Timeserver
+  "1.europe.pool.ntp.org\0      ", // NTP Timeserver
+  "collectord\0                 ", // EMS Collector Daemon Host
+  7950,                          // EMS Collector Daemon Port
 };
 
 typedef union {

@@ -40,14 +40,9 @@ The firmware includes a tiny HTTP server based on
 [esphttpd](http://www.esp8266.com/viewforum.php?f=34)
 with a simple web interface, many thanks to Jeroen Domburg for making it available!
 
-###[Latest release](https://github.com/susisstrolch/ems-esp-link/releases)
-Note that the [stable V1.0 release](https://github.com/susisstrolch/ems-esp-link/releases/tag/v1.0.0) is
-recommended if you do not need the outbound TCP connections and have a 512KB flash chip.
-
 Eye Candy
 ---------
-These screen shots show the Home page, the Wifi configuration page, the console for the
-attached microcontroller, and the pin assignments card:
+These screen shots show the Home page, the (Wifi) configuration page, the EMS Debug Log page and the EMS-Link debug page.
 
 <img width="45%" src="https://cloud.githubusercontent.com/assets/39480/8261425/6ca395a6-167f-11e5-8e92-77150371135a.png">
 <img width="45%" src="https://cloud.githubusercontent.com/assets/39480/8261427/6caf7326-167f-11e5-8085-bc8b20159b2b.png">
@@ -60,9 +55,8 @@ Hardware info
 This firmware is designed for esp8266 ESP07/ESP12 modules which have most ESP I/O pins available and at least 512KB flash.
 
 The default connections are:
-- URXD: connect to TX of microcontroller
-- UTXD: connect to RX of microcontroller
-- GPIO2: optionally connect yellow "ser" LED to 3.3V (indicates serial activity)
+- URXD: connect to TX of EMS Gateway
+- UTXD: connect to RX of EMS Gateway
 
 Initial flashing
 ----------------

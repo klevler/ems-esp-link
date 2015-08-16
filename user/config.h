@@ -12,6 +12,10 @@ typedef struct {
   uint8_t  swap_uart;                  // swap uart0 to gpio 13&15
   uint8_t  tcp_enable, rssi_enable;    // TCP client settings
   char     api_key[48];                // RSSI submission API key (Grovestreams for now)
+  char    sntp_server1[32];
+  char    sntp_server2[32];
+  char    collectord_host[32];        // IP/Hostname Collectord
+  int16_t collectord_port;            // portnumber
 } FlashConfig;
 extern FlashConfig flashConfig;
 

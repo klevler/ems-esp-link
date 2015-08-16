@@ -5,6 +5,7 @@
 
 void consoleInit(void);
 void ICACHE_FLASH_ATTR console_write_char(char c);
+void ICACHE_FLASH_ATTR console_write_str(char *p);
 int ajaxConsole(HttpdConnData *connData);
 int ajaxConsoleReset(HttpdConnData *connData);
 int ajaxConsoleBaud(HttpdConnData *connData);
