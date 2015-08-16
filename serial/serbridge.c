@@ -14,6 +14,7 @@
 #include "config.h"
 #include "console.h"
 #include "tcpclient.h"
+#include "ems.h"
 
 static struct espconn serbridgeConn;
 static esp_tcp serbridgeTcp;
@@ -204,7 +205,7 @@ static sint8 ICACHE_FLASH_ATTR sendtxbuffer(serbridgeConnData *conn) {
 static sint8 ICACHE_FLASH_ATTR espbuffsend(serbridgeConnData *conn, const char *data, uint16 len) {
 	if (conn->txbufferlen + len > MAX_TXBUFFER) {
 		os_printf("espbuffsend: txbuffer[%p:%d] full on conn %p \n", data, len, conn);
-		memDump((void *)conn->txbuffer,conn->txbufferlen);
+		// memDump((void *)conn->txbuffer,conn->txbufferlen);
 		memDump((void *)data, len);
 		return -128;
 	}
@@ -229,17 +230,31 @@ serbridgeSentCb(void *arg) {
 	sendtxbuffer(conn); // send possible new data in txbuffer
 }
 
+char  ICACHE_FLASH_ATTR
+hexNipple (uint8_t byte) {
+	return (byte < 10 ? (char) (byte + 0x30) : (char)(byte + 0x61 - 10));
+}
+
 // callback with a buffer of characters that have arrived on the uart
 void ICACHE_FLASH_ATTR
 serbridgeUartCb(char *buf, int length) {
-	char tmp[4];
-	// push the buffer into the microcontroller console
-	for (int i=0; i<length; i++) {
-		// we do a hexdump, so it's easier to debug...
-		os_sprintf(tmp, "%02x", buf[i]);
-		console_write_char(tmp[0]);
-		console_write_char(tmp[1]);
+	char tmp[256];
+	_EMSRxBuf *p = (_EMSRxBuf *)buf;
+
+	(void) os_sprintf(tmp, "%02d:%02d:%02d [%d.%03d]: <%d>",
+						(int)(p->sntp_timeStamp % 86400) / 3600 ,
+						(int)(p->sntp_timeStamp % 3600) / 60 ,
+						(int)(p->sntp_timeStamp % 60) ,
+						(int)p->sys_timeStamp / 1000,
+						(int)p->sys_timeStamp % 1000,
+						(int)p->writePtr - 2);		// don't show the trailer
+	console_write_str(tmp);
+
+	for (int i=0; i < (p->writePtr - 2); i++) {
+		uint8_t b = p->buffer[i];
 		console_write_char(' ');
+		console_write_char(hexNipple(b >> 4));
+		console_write_char(hexNipple(b & 0xf));
 	}
 	console_write_char('\n');
 
@@ -251,7 +266,6 @@ serbridgeUartCb(char *buf, int length) {
 			}
 		}
 	}
-	serledFlash(50); // short blink on serial LED
 }
 
 //===== Connect / disconnect
