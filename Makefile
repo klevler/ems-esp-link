@@ -1,5 +1,5 @@
 #
-# Makefile for esp-link - https://github.com/jeelabs/esp-link
+# Makefile for ems-link - https://github.com/jeelabs/esp-link
 #
 # Start by setting the directories for the toolchain a few lines down
 # the default target will build the firmware images
@@ -8,7 +8,7 @@
 # `VERBOSE=1 make ...` will print debug info
 # `ESP_HOSTNAME=my.esp.example.com make wiflash` is an easy way to override a variable
 #
-# Makefile heavily adapted to esp-link and wireless flashing by Thorsten von Eicken
+# Makefile heavily adapted to ems-link and wireless flashing by Thorsten von Eicken
 # Original from esphttpd and others...
 
 # --------------- toolchain configuration ---------------
@@ -55,7 +55,7 @@ ESP_FLASH_MAX       ?= 503808  # max bin file for 512KB flash partition: 492KB
 endif
 
 # hostname or IP address for wifi flashing
-ESP_HOSTNAME        ?= ems-esp-link
+ESP_HOSTNAME        ?= ems-link
 
 # The pin assignments below are used when the settings in flash are invalid, they
 # can be changed via the web interface
@@ -68,22 +68,22 @@ LED_CONN_PIN        ?= 0
 # GPIO pin used for "serial activity" LED, active low
 LED_SERIAL_PIN      ?= 14
 
-# --------------- esp-link version        ---------------
+# --------------- ems-link version        ---------------
 
-# This queries git to produce a version string like "esp-link v0.9.0 2015-06-01 34bc76"
+# This queries git to produce a version string like "ems-link v0.9.0 2015-06-01 34bc76"
 # If you don't have a proper git checkout or are on windows, then simply swap for the constant
 # Steps to release: create release on github, git pull, git describe --tags to verify you're
-# on the release tag, make release, upload esp-link.tgz into the release files
-#VERSION ?= "esp-link custom version"
+# on the release tag, make release, upload ems-link.tgz into the release files
+#VERSION ?= "ems-link custom version"
 DATE    := $(shell date '+%F %T')
 BRANCH  := $(shell git describe --tags)
 SHA     := $(shell if git diff --quiet HEAD; then git rev-parse --short HEAD | cut -d"/" -f 3; \
 	else echo "development"; fi)
-VERSION ?=esp-link $(BRANCH) - $(DATE) - $(SHA)
+VERSION ?=ems-link $(BRANCH) - $(DATE) - $(SHA)
 
-# --------------- esp-link config options ---------------
+# --------------- ems-link config options ---------------
 
-# If CHANGE_TO_STA is set to "yes" the esp-link module will switch to station mode
+# If CHANGE_TO_STA is set to "yes" the ems-link module will switch to station mode
 # once successfully connected to an access point. Else it will stay in AP+STA mode.
 
 CHANGE_TO_STA ?= yes
@@ -338,10 +338,10 @@ espfs/mkespfsimage/mkespfsimage: espfs/mkespfsimage/
 	$(Q) $(MAKE) -C espfs/mkespfsimage USE_HEATSHRINK="$(USE_HEATSHRINK)" GZIP_COMPRESSION="$(GZIP_COMPRESSION)"
 
 release: all
-	$(Q) rm -rf release; mkdir -p release/esp-link
+	$(Q) rm -rf release; mkdir -p release/ems-link
 	$(Q) cp $(FW_BASE)/user1.bin $(FW_BASE)/user2.bin $(SDK_BASE)/bin/blank.bin \
-		   "$(SDK_BASE)/bin/boot_v1.4(b1).bin" wiflash release/esp-link
-	$(Q) tar zcf esp-link.tgz -C release esp-link
+		   "$(SDK_BASE)/bin/boot_v1.4(b1).bin" wiflash release/ems-link
+	$(Q) tar zcf ems-link.tgz -C release ems-link
 	$(Q) rm -rf release
 
 clean:

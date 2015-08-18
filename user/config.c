@@ -11,19 +11,17 @@ extern uint16_t inet_chksum(void *dataptr, uint16_t len);
 
 FlashConfig flashConfig;
 FlashConfig flashDefault = {
-  33, 0, 0,
-  MCU_RESET_PIN, MCU_ISP_PIN, LED_CONN_PIN, LED_SERIAL_PIN,
-  9600,
-  "ems-link\0                   ", // hostname
-  0, 0x00ffffff, 0,                // static ip, netmask, gateway
-  0,                               // log mode
-  0,                               // swap_uart
-  1, 0,                            // tcp_enable, rssi_enable
-  "\0",                            // api_key
-  "0.europe.pool.ntp.org\0      ", // NTP Timeserver
-  "1.europe.pool.ntp.org\0      ", // NTP Timeserver
-  "collectord\0                 ", // EMS Collector Daemon Host
-  7950,                          // EMS Collector Daemon Port
+  2107,                       // sequence
+  0,                          // crc
+  9600,                       // Baudrate
+  "ems-link\0",               // hostname
+  0, 0x00ffffff, 0,           // static ip, netmask, gateway
+  0,                          // log mode
+  "0.europe.pool.ntp.org\0",  // NTP Timeserver
+  2,                          // Timezone
+  "collectord\0",             // EMS Collector Daemon Host
+  7950,                       // EMS Collector Daemon Port
+  "\0",                       // api_key
 };
 
 typedef union {
@@ -35,7 +33,6 @@ typedef union {
 
 #define FLASH_ADDR   (0x3E000)
 #define FLASH_SECT   (4096)
-static int flash_pri; // primary flash sector (0 or 1, or -1 for error)
 
 #if 1
 void ICACHE_FLASH_ATTR
@@ -51,42 +48,28 @@ memDump(void *addr, int len) {
 
 bool ICACHE_FLASH_ATTR configSave(void) {
   FlashFull ff;
-  memset(&ff, 0, sizeof(ff));
+
+  // erase primary
+  uint32_t addr = FLASH_ADDR;
+  if (spi_flash_erase_sector(addr>>12) != SPI_FLASH_RESULT_OK) goto fail;
+
+  memset(&ff, 0xff, sizeof(ff));
   memcpy(&ff, &flashConfig, sizeof(FlashConfig));
-  uint32_t seq = ff.fc.seq+1;
-  // erase secondary
-  uint32_t addr = FLASH_ADDR + (1-flash_pri)*FLASH_SECT;
-  if (spi_flash_erase_sector(addr>>12) != SPI_FLASH_RESULT_OK)
-    goto fail; // no harm done, give up
-  // calculate CRC
-  ff.fc.seq = seq;
-  ff.fc.magic = FLASH_MAGIC;
-  ff.fc.crc = 0;
-  //os_printf("cksum of: ");
-  //memDump(&ff, sizeof(ff));
-  ff.fc.crc = inet_chksum(&ff, sizeof(ff));
-  //os_printf("cksum is %04x\n", ff.fc.crc);
-  // write primary with incorrect seq
-  ff.fc.seq = 0xffffffff;
-  if (spi_flash_write(addr, (void *)&ff, sizeof(ff)) != SPI_FLASH_RESULT_OK)
-    goto fail; // no harm done, give up
-  // fill in correct seq
-  ff.fc.seq = seq;
-  if (spi_flash_write(addr, (void *)&ff, sizeof(uint32_t)) != SPI_FLASH_RESULT_OK)
-    goto fail; // most likely failed, but no harm if successful
-  // now that we have safely written the new version, erase old primary
-  addr = FLASH_ADDR + flash_pri*FLASH_SECT;
-  flash_pri = 1-flash_pri;
-  if (spi_flash_erase_sector(addr>>12) != SPI_FLASH_RESULT_OK)
-    return true; // no back-up but we're OK
-  // write secondary
-  ff.fc.seq = 0xffffffff;
-  if (spi_flash_write(addr, (void *)&ff, sizeof(ff)) != SPI_FLASH_RESULT_OK)
-    return true; // no back-up but we're OK
-  ff.fc.seq = seq;
-  spi_flash_write(addr, (void *)&ff, sizeof(uint32_t));
+
+  ff.fc.crc = inet_chksum(&ff, sizeof(FlashConfig));  // calculate CRC
+
+  // write primary
+  if (spi_flash_write(addr, (void *)&ff, sizeof(ff)) != SPI_FLASH_RESULT_OK) goto fail;
+
+  // erase backup
+  addr = FLASH_ADDR + FLASH_SECT;
+  if (spi_flash_erase_sector(addr>>12) != SPI_FLASH_RESULT_OK) return true; // no backup but we're OK
+
+  // write backup
+  spi_flash_write(addr, (void *)&ff, sizeof(ff)); // no backup but we're OK
   return true;
-fail:
+
+  fail:
   os_printf("*** Failed to save config ***\n");
   return false;
 }
@@ -96,45 +79,43 @@ void ICACHE_FLASH_ATTR configWipe(void) {
   spi_flash_erase_sector((FLASH_ADDR+FLASH_SECT)>>12);
 }
 
-static uint32_t ICACHE_FLASH_ATTR selectPrimary(FlashFull *fc0, FlashFull *fc1);
+// decide which flash sector to use based on crc and version (0 or 1, or -1 for error)
+static int ICACHE_FLASH_ATTR selectFlash(FlashFull *ff0, FlashFull *ff1) {
+  uint16_t crc;
+  uint16_t version = flashDefault.version;
 
-bool ICACHE_FLASH_ATTR configRestore(void) {
-  FlashFull ff0, ff1;
-  // read both flash sectors
-  if (spi_flash_read(FLASH_ADDR, (void *)&ff0, sizeof(ff0)) != SPI_FLASH_RESULT_OK)
-    memset(&ff0, 0, sizeof(ff0)); // clear in case of error
-  if (spi_flash_read(FLASH_ADDR+FLASH_SECT, (void *)&ff1, sizeof(ff1)) != SPI_FLASH_RESULT_OK)
-    memset(&ff1, 0, sizeof(ff1)); // clear in case of error
-  // figure out which one is good
-  flash_pri = selectPrimary(&ff0, &ff1);
-  // if neither is OK, we revert to defaults
-  if (flash_pri < 0) {
-    memcpy(&flashConfig, &flashDefault, sizeof(FlashConfig));
-    flash_pri = 0;
-    return false;
-  }
-  // copy good one into global var and return
-  memcpy(&flashConfig, flash_pri == 0 ? &ff0.fc : &ff1.fc, sizeof(FlashConfig));
-  return true;
-}
-
-static uint32_t ICACHE_FLASH_ATTR selectPrimary(FlashFull *ff0, FlashFull *ff1) {
   // check CRC of ff0
-  uint16_t crc = ff0->fc.crc;
+  crc = ff0->fc.crc;
   ff0->fc.crc = 0;
-  bool ff0_crc_ok = inet_chksum(ff0, sizeof(FlashFull)) == crc;
+  if ((ff0->fc.version == version) && (inet_chksum(ff0, sizeof(FlashConfig)) == crc)) return 0;
 
   // check CRC of ff1
   crc = ff1->fc.crc;
   ff1->fc.crc = 0;
-  bool ff1_crc_ok = inet_chksum(ff1, sizeof(FlashFull)) == crc;
+  if ((ff1->fc.version == version) && (inet_chksum(ff1, sizeof(FlashConfig)) == crc)) return 1;
 
-  // decided which we like better
-  if (ff0_crc_ok)
-    if (!ff1_crc_ok || ff0->fc.seq >= ff1->fc.seq)
-      return 0; // use first sector as primary
-    else
-      return 1; // second sector is newer
-  else
-    return ff1_crc_ok ? 1 : -1;
+  return -1;
+}
+
+bool ICACHE_FLASH_ATTR configRestore(void) {
+  // read both flash sectors
+  FlashFull ff0, ff1;
+  if (spi_flash_read(FLASH_ADDR, (void *)&ff0, sizeof(ff0)) != SPI_FLASH_RESULT_OK)
+    memset(&ff0, 0, sizeof(ff0)); // clear in case of error
+  if (spi_flash_read(FLASH_ADDR+FLASH_SECT, (void *)&ff1, sizeof(ff1)) != SPI_FLASH_RESULT_OK)
+    memset(&ff1, 0, sizeof(ff1)); // clear in case of error
+
+  // figure out which one is good
+  int flash = selectFlash(&ff0, &ff1);
+
+  // if neither is OK, we revert to defaults
+  if (flash < 0) {
+    memcpy(&flashConfig, &flashDefault, sizeof(FlashConfig));
+    os_printf("*** FAILED to restore config ***\n");
+    return false;
+  }
+
+  // copy good one into global var and return
+  memcpy(&flashConfig, flash == 0 ? &ff0.fc : &ff1.fc, sizeof(FlashConfig));
+  return true;
 }

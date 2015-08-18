@@ -12,6 +12,7 @@ int cgiWiFiConnect(HttpdConnData *connData);
 int cgiWiFiSetMode(HttpdConnData *connData);
 int cgiWiFiConnStatus(HttpdConnData *connData);
 int cgiWiFiSpecial(HttpdConnData *connData);
+int cgiWiFiEMSSetting(HttpdConnData *connData);
 void wifiInit(void);
 
 #endif
