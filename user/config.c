@@ -29,9 +29,8 @@ typedef union {
   uint8_t     block[128];
 } FlashFull;
 
-#define FLASH_MAGIC  (0xaa55)
-
-#define FLASH_ADDR   (0x3E000)
+// change suggested by kriegste (this may not work for the asymmetric 4MByte layout- but for 512kByte and 1MByte it does)
+#define FLASH_ADDR (4*1024 + FIRMWARE_SIZE + 16*1024 - 8*1024)
 #define FLASH_SECT   (4096)
 
 #if 1
