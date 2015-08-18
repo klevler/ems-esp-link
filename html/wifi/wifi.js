@@ -189,6 +189,28 @@ function changeSpecial(e) {
     });
 }
 
+function changeEMS(e) {
+  e.preventDefault();
+  var url = "emssettings";
+  url += "?ntpserver=" + encodeURIComponent($("#wifi-ntpserver").value);
+  url += "&timezone=" + encodeURIComponent($("#wifi-timezone").value);
+  url += "&collectord=" + encodeURIComponent($("#wifi-collectord").value);
+
+  hideWarning();
+  var cb = $("#ems-button");
+  addClass(cb, 'pure-button-disabled');
+  ajaxSpin("POST", url, function(resp) {
+      removeClass(cb, 'pure-button-disabled');
+      getWifiInfo();
+    }, function(s, st) {
+      showWarning("Error: "+st);
+      removeClass(cb, 'pure-button-disabled');
+      getWifiInfo();
+    });
+
+}
+
+
 function doDhcp() {
 	$('#dhcp-on').removeAttribute('hidden');
 	$('#dhcp-off').setAttribute('hidden', '');

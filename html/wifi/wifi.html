@@ -63,6 +63,26 @@
                     class="pure-button button-primary">Change!</button>
           </form>
         </div></div>
+        <div class="pure-u-1 pure-u-md-1-2">
+          <div class="card">
+            <h1>EMS Settings</h1>
+            <form action="#" id="emsform" class="pure-form">
+              <legend>NTP Server and Collector Daemon</legend>
+              <div id="NTP-Server" class="pure-form-stacked">
+                <label>NTP Server</label>
+                <input id="wifi-ntpserver" type="text" name="ntpserver"/>
+                <label>Timezone (-12 ... 12)</label>
+                <input id="wifi-timezone" type="text" name="timezone"/>
+              </div>
+              <div id="Collector Daemon" class="pure-form-stacked">
+                  <label>Collector Daemon (host:port)</label>
+                  <input id="wifi-collectord" type="text" name="collectord"/>
+              </div>
+              <button id="ems-button" type="submit"
+                      class="pure-button button-primary">Change!</button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -78,6 +98,7 @@ onLoad(function() {
   bnd($("#specform"), "submit", changeSpecial);
   bnd($("#dhcp-ron"), "click", doDhcp);
   bnd($("#dhcp-roff"), "click", doStatic);
+  bnd($("#emsform"), "submit", changeEMS);
   scanTimeout = window.setTimeout(scanAPs, 500);
 });
 </script>

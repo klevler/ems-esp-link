@@ -20,6 +20,7 @@ Cgi/template routines for the /wifi url.
 #include "status.h"
 #include "config.h"
 #include "log.h"
+#include "ems.h"
 
 //#define SLEEP_MODE LIGHT_SLEEP_T
 #define SLEEP_MODE MODEM_SLEEP_T
@@ -406,13 +407,15 @@ int ICACHE_FLASH_ATTR cgiWiFiSpecial(HttpdConnData *connData) {
 
 	} else {
 		// no static IP, set hostname
-		if (hl == 0) os_strcpy(hostname, "esp-link");
+		if (hl == 0) os_strcpy(hostname, "ems-link");
 		flashConfig.staticip = 0;
 		os_strcpy(flashConfig.hostname, hostname);
 		os_sprintf(url, "{\"url\": \"http://%s\"}", hostname);
 	}
 
 	configSave(); // ignore error...
+    emsSNTPReInit();            // (re)init SNTP system
+
 	// schedule change-over
 	os_timer_disarm(&reassTimer);
 	os_timer_setfn(&reassTimer, configWifiIP, NULL);
@@ -420,6 +423,39 @@ int ICACHE_FLASH_ATTR cgiWiFiSpecial(HttpdConnData *connData) {
 	// return redirect info
 	jsonHeader(connData, 200);
 	httpdSend(connData, url, -1);
+	return HTTPD_CGI_DONE;
+}
+
+// EMS Settings
+
+int ICACHE_FLASH_ATTR cgiWiFiEMSSetting(HttpdConnData *connData) {
+	if (connData->conn==NULL) return HTTPD_CGI_DONE;
+
+	char ntpserver[32];
+	char timezone[4];
+	char collectord[32];
+
+	int nl = httpdFindArg(connData->getArgs, "ntpserver", ntpserver, sizeof(ntpserver));
+	int tl = httpdFindArg(connData->getArgs, "timezone", timezone, sizeof(timezone));
+	int cl = httpdFindArg(connData->getArgs, "collectord", collectord, sizeof(collectord));
+
+	flashConfig.timezone = tl ? atoi(timezone) : 0;
+	os_strcpy(flashConfig.ntp_server, nl ? ntpserver : "");
+
+	// split collectord string into host and port
+	if (cl) {
+		char *p = collectord;
+		while (*p && *p != ':') p++;	// find port delimiter
+
+		flashConfig.collectord_port = *p ? atoi(p + 1) : 7950;
+			*p++ = '\0';				// separate host and port
+	}
+	os_strcpy(flashConfig.collectord, collectord);
+
+	configSave(); // ignore error...
+	emsSNTPReInit();	// (re)init SNTP
+
+	jsonHeader(connData, 200);
 	return HTTPD_CGI_DONE;
 }
 
@@ -503,6 +539,10 @@ int ICACHE_FLASH_ATTR printWifiInfo(char *buff) {
 	len += os_sprintf(buff+len, ", \"staticip\": \"%d.%d.%d.%d\"", IP2STR(&flashConfig.staticip));
 	len += os_sprintf(buff+len, ", \"dhcp\": \"%s\"", flashConfig.staticip > 0 ? "off" : "on");
 
+	len += os_sprintf(buff+len, ", \"ntpserver\": \"%s\"", flashConfig.ntp_server);
+	len += os_sprintf(buff+len, ", \"timezone\": \"%d\"", flashConfig.timezone);
+	len += os_sprintf(buff+len, ", \"collectord\": \"%s:%d\"", flashConfig.collectord, flashConfig.collectord_port);
+
 	return len;
 }
 
@@ -520,20 +560,6 @@ int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
 	if (wifiReason != 0) {
 		len += os_sprintf(buff+len, "\"reason\": \"%s\", ", wifiGetReason());
 	}
-
-#if 0
-	// commented out 'cause often the client that requested the change can't get a request in to
-	// find out that it succeeded. Better to just wait the std 15 seconds...
-	int st=wifi_station_get_connect_status();
-	if (st == STATION_GOT_IP) {
-		if (wifi_get_opmode() != 1) {
-			// Reset into AP-only mode sooner.
-			os_timer_disarm(&resetTimer);
-			os_timer_setfn(&resetTimer, resetTimerCb, NULL);
-			os_timer_arm(&resetTimer, 1000, 0);
-		}
-	}
-#endif
 
 	len += os_sprintf(buff+len, "\"x\":0}\n");
 

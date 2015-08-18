@@ -2,20 +2,17 @@
 #define CONFIG_H
 
 typedef struct {
-  uint32_t seq; // flash write sequence number
-  uint16_t magic, crc;
-  int8_t   reset_pin, isp_pin, conn_led_pin, ser_led_pin;
+  uint32_t version;                   // flash write sequence number
+  uint16_t crc;
   int32_t  baud_rate;
   char     hostname[32];               // if using DHCP
   uint32_t staticip, netmask, gateway; // using DHCP if staticip==0
-  uint8_t  log_mode;                   // UART log debug mode
-  uint8_t  swap_uart;                  // swap uart0 to gpio 13&15
-  uint8_t  tcp_enable, rssi_enable;    // TCP client settings
-  char     api_key[48];                // RSSI submission API key (Grovestreams for now)
-  char    sntp_server1[32];
-  char    sntp_server2[32];
-  char    collectord_host[32];        // IP/Hostname Collectord
+  uint8_t  log_mode;
+  char     ntp_server[32];
+  int16_t  timezone;                  // Timezone (-12 - + 12)
+  char    collectord[32];             // IP/Hostname Collectord
   int16_t collectord_port;            // portnumber
+  char     api_key[48];               // RSSI submission API key (Grovestreams for now)
 } FlashConfig;
 extern FlashConfig flashConfig;
 

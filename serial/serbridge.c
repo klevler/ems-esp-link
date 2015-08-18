@@ -27,11 +27,7 @@ serbridgeConnData connData[MAX_CONN];
 // Given a pointer to an espconn struct find the connection that correcponds to it
 static serbridgeConnData ICACHE_FLASH_ATTR *serbridgeFindConnData(void *arg) {
 	struct espconn *conn = arg;
-<<<<<<< HEAD
 	return arg == NULL ? NULL : (serbridgeConnData *)conn->reverse;
-=======
-	return (serbridgeConnData *)conn->reverse;
->>>>>>> remove code not required for EMS Interface
 }
 
 extern void ICACHE_FLASH_ATTR
@@ -205,7 +201,6 @@ static sint8 ICACHE_FLASH_ATTR sendtxbuffer(serbridgeConnData *conn) {
 static sint8 ICACHE_FLASH_ATTR espbuffsend(serbridgeConnData *conn, const char *data, uint16 len) {
 	if (conn->txbufferlen + len > MAX_TXBUFFER) {
 		os_printf("espbuffsend: txbuffer[%p:%d] full on conn %p \n", data, len, conn);
-		// memDump((void *)conn->txbuffer,conn->txbufferlen);
 		memDump((void *)data, len);
 		return -128;
 	}
@@ -230,7 +225,7 @@ serbridgeSentCb(void *arg) {
 	sendtxbuffer(conn); // send possible new data in txbuffer
 }
 
-char  ICACHE_FLASH_ATTR
+static char  ICACHE_FLASH_ATTR
 hexNipple (uint8_t byte) {
 	return (byte < 10 ? (char) (byte + 0x30) : (char)(byte + 0x61 - 10));
 }
@@ -238,7 +233,7 @@ hexNipple (uint8_t byte) {
 // callback with a buffer of characters that have arrived on the uart
 void ICACHE_FLASH_ATTR
 serbridgeUartCb(char *buf, int length) {
-	char tmp[256];
+	char tmp[32];
 	_EMSRxBuf *p = (_EMSRxBuf *)buf;
 
 	(void) os_sprintf(tmp, "%02d:%02d:%02d [%d.%03d]: <%d>",

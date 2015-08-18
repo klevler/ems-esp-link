@@ -87,6 +87,7 @@ HttpdBuiltInUrl builtInUrls[]={
 	{"/wifi/connstatus", cgiWiFiConnStatus, NULL},
 	{"/wifi/setmode", cgiWiFiSetMode, NULL},
 	{"/wifi/special", cgiWiFiSpecial, NULL},
+	{"/wifi/emssettings", cgiWiFiEMSSetting, NULL},
 
 	{"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
 	{NULL, NULL, NULL}
