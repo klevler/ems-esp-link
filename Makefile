@@ -32,7 +32,7 @@ ESPBAUD		?= 115200
 
 # --------------- chipset configuration   ---------------
 
-# Pick your flash size: "512KB" or "4MB"
+# Pick your flash size: "512KB", "1MB" or "4MB"
 FLASH_SIZE ?= 512KB
 
 ifeq ("$(FLASH_SIZE)","512KB")
@@ -41,6 +41,13 @@ ESP_SPI_SIZE        ?= 0      # 0->512KB
 ESP_FLASH_MODE      ?= 0      # 0->QIO
 ESP_FLASH_FREQ_DIV  ?= 0      # 0->40Mhz
 ESP_FLASH_MAX       ?= 241664 # max bin file for 512KB flash: 236KB
+
+else ifeq ("$(FLASH_SIZE)","1MB")
+# ESP-01E
+ESP_SPI_SIZE        ?= 2      # 2->1MB (512KB+512KB)
+ESP_FLASH_MODE      ?= 0      # 0->QIO
+ESP_FLASH_FREQ_DIV  ?= 15      # 15->80MHz
+ESP_FLASH_MAX       ?= 503808 # max bin file for 1MB flash: 492KB
 
 else
 # Winbond 25Q32 4MB flash, typ for esp-12
@@ -277,9 +284,37 @@ wiflash: all
 	./wiflash $(ESP_HOSTNAME) $(FW_BASE)/user1.bin $(FW_BASE)/user2.bin
 
 flash: all
+ifeq ("$(FLASH_SIZE)","512KB")
 	$(Q) $(ESPTOOL) --port $(ESPPORT) --baud $(ESPBAUD) write_flash \
-	  0x00000 "$(SDK_BASE)/bin/boot_v1.4(b1).bin" 0x01000 $(FW_BASE)/user1.bin \
-	  0x7E000 $(SDK_BASE)/bin/blank.bin
+	0x00000 "$(SDK_BASE)/bin/boot_v1.4(b1).bin" 0x01000 $(FW_BASE)/user1.bin \
+	0x7C000 $(SDK_BASE)/bin/esp_init_data_default.bin 0x7E000 $(SDK_BASE)/bin/blank.bin
+else ifeq ("$(FLASH_SIZE)","1MB")
+	$(Q) $(ESPTOOL) --port $(ESPPORT) --baud $(ESPBAUD) write_flash -fs 8m -ff 80m \
+	0x00000 "$(SDK_BASE)/bin/boot_v1.4(b1).bin" 0x01000 $(FW_BASE)/user1.bin \
+	0xFC000 $(SDK_BASE)/bin/esp_init_data_default.bin 0xFE000 $(SDK_BASE)/bin/blank.bin
+else
+	$(Q) $(ESPTOOL) --port $(ESPPORT) --baud $(ESPBAUD) write_flash -fs 32m -ff 80m \
+	0x00000 "$(SDK_BASE)/bin/boot_v1.4(b1).bin" 0x01000 $(FW_BASE)/user1.bin \
+	0x3FC000 $(SDK_BASE)/bin/esp_init_data_default.bin 0x3FE000 $(SDK_BASE)/bin/blank.bin
+endif
+
+image: all
+ifeq ("$(FLASH_SIZE)","512KB")
+	srec_cat "$(SDK_BASE)/bin/boot_v1.4(b1).bin" -bin -off 0x00000 -gen -maximum-addr "$(SDK_BASE)/bin/boot_v1.4(b1).bin" -bin 0x01000 -const 0xFF \
+      "$(FW_BASE)/user1.bin" -bin -off 0x01000 -gen -maximum-addr "$(FW_BASE)/user1.bin" -bin -off 0x01000 0x7C000 -const 0xFF \
+      "$(SDK_BASE)/bin/esp_init_data_default.bin" -binary -offset 0x7C000 -gen -maximum-addr "$(SDK_BASE)/bin/esp_init_data_default.bin" -bin -off 0x7C000 0x80000 -const 0xFF \
+      -o "$(FW_BASE)/image.bin" -bin
+else ifeq ("$(FLASH_SIZE)","1MB")
+	srec_cat "$(SDK_BASE)/bin/boot_v1.4(b1).bin" -bin -off 0x00000 -gen -maximum-addr "$(SDK_BASE)/bin/boot_v1.4(b1).bin" -bin 0x01000 -const 0xFF \
+      "$(FW_BASE)/user1.bin" -bin -off 0x01000 -gen -maximum-addr "$(FW_BASE)/user1.bin" -bin -off 0x01000 0xFC000 -const 0xFF \
+      "$(SDK_BASE)/bin/esp_init_data_default.bin" -binary -offset 0xFC000 -gen -maximum-addr "$(SDK_BASE)/bin/esp_init_data_default.bin" -bin -off 0xFC000 0x100000 -const 0xFF \
+      -o "$(FW_BASE)/image.bin" -bin
+else
+	srec_cat "$(SDK_BASE)/bin/boot_v1.4(b1).bin" -bin -off 0x00000 -gen -maximum-addr "$(SDK_BASE)/bin/boot_v1.4(b1).bin" -bin 0x01000 -const 0xFF \
+      "$(FW_BASE)/user1.bin" -bin -off 0x01000 -gen -maximum-addr "$(FW_BASE)/user1.bin" -bin -off 0x01000 0x3FC000 -const 0xFF \
+      "$(SDK_BASE)/bin/esp_init_data_default.bin" -binary -offset 0x3FC000 -gen -maximum-addr "$(SDK_BASE)/bin/esp_init_data_default.bin" -bin -off 0x3FC000 0x400000 -const 0xFF \
+      -o "$(FW_BASE)/image.bin" -bin
+endif
 
 yui/$(YUI-COMPRESSOR):
 	$(Q) mkdir -p yui
