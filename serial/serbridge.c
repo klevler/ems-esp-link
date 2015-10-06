@@ -255,7 +255,7 @@ serbridgeUartCb(char *buf, int length) {
 
 	// push the buffer into each open connection
 	if (length > 0) {
-		for (int i=0; i<MAX_CONN; i++) {
+		for (int i = 0; i < MAX_CONN; i++) {
 			if (connData[i].conn && connData[i].conn_mode != cmTcpClient) {
 				espbuffsend(&connData[i], buf, length);
 			}
