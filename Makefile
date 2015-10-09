@@ -13,7 +13,7 @@
 
 # --------------- toolchain configuration ---------------
 # specify which SDK to use
-SDK_VERSION ?= esp_iot_sdk_v1.3.0
+SDK_VERSION ?= esp_iot_sdk_v1.4.0
 
 # Base directory for the compiler. Needs a / at the end.
 # Typically you'll install https://github.com/pfalcon/esp-open-sdk
@@ -33,7 +33,7 @@ ESPBAUD		?= 115200
 # --------------- chipset configuration   ---------------
 
 # Pick your flash size: "512KB", "1MB" or "4MB"
-FLASH_SIZE ?= 512KB
+FLASH_SIZE ?= 4MB
 
 ifeq ("$(FLASH_SIZE)","512KB")
 # Winbond 25Q40 512KB flash, typ for esp-01 thru esp-11
