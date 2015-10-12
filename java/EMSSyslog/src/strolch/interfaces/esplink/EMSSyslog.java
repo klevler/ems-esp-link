@@ -70,7 +70,7 @@ public class EMSSyslog {
 		this.debugLevel = debug;
 	}
 
-	public EmsSyslog(String emsServer, int emsPort) {
+	public EMSSyslog(String emsServer, int emsPort) {
 		this.emsServer = emsServer;
 		this.emsPort = emsPort;
 		this.skt = null;
@@ -273,7 +273,7 @@ public class EMSSyslog {
 	public static void main(String args[]) {
 		int[] b;
 
-		EmsSyslog emsBus = new EmsSyslog(args.length > 0 ? args[0] : "192.168.254.115", 23);
+		EMSSyslog emsBus = new EMSSyslog(args.length > 0 ? args[0] : "192.168.254.115", 23);
 		SyslogConfigIF config = Syslog.getInstance("udp").getConfig(); // create the Syslog config
 
 		config.setHost(args.length > 1 ? args[1] : syslogServer); 	// Diskstation is running the syslog daemon
