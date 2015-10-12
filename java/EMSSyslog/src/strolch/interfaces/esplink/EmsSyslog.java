@@ -1,9 +1,9 @@
 package strolch.interfaces.esplink;
 
 /*
- **	javac -cp syslog4j-0.9.46-bin.jar gmann/interfaces/esplink/EmsBus.java
- **	jar cvfe EmsSyslog.jar gmann.interfaces.esplink.EmsBus  gmann/interfaces/esplink/EmsBus.class syslog4j-0.9.46-bin.jar
- **	java -jar EmsSyslog.jar
+ **	javac -cp syslog4j-0.9.46-bin.jar strolch/interfaces/esplink/EMSSyslog.java
+ **	jar cvfe EMSSyslog.jar strolch/interfaces/esplink/EMSSyslog  strolch/interfaces/esplink/EMSSyslog.class syslog4j-0.9.46-bin.jar
+ **	java -jar EMSSyslog.jar <ems-link> <syslog-server>
  */
 
 //import java.lang.*;
@@ -12,7 +12,7 @@ import java.net.*;
 import java.util.Date;
 import org.productivity.java.syslog4j.*; // http://www.syslog4j.org/
 
-public class EmsSyslog {
+public class EMSSyslog {
 
 	private String emsServer;
 	private int emsPort;
