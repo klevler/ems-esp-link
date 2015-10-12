@@ -1,4 +1,4 @@
-package gmann.interfaces.esplink;
+package strolch.interfaces.esplink;
 
 /*
  **	javac -cp syslog4j-0.9.46-bin.jar gmann/interfaces/esplink/EmsBus.java
@@ -12,10 +12,10 @@ import java.net.*;
 import java.util.Date;
 import org.productivity.java.syslog4j.*; // http://www.syslog4j.org/
 
-public class EmsBus {
+public class EmsSyslog {
 
-	private String emsServer = "192.168.254.115";
-	private int emsPort 	= 23; // EMS-ESP-Link: raw debug port
+	private String emsServer;
+	private int emsPort;
 
 	private static String syslogServer = "192.168.254.20";
 	private static int syslogPort = 514;
@@ -34,15 +34,21 @@ public class EmsBus {
 	private int[] data = new int[512];
 
 	// simple bytes to string converter
-	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	final protected static char[] HEXARRAY = "0123456789ABCDEF".toCharArray();
+	
+	// convenience...
+	private static final int EMSPKG_HEADER_SIZE = 10;	// Timestamp, ESP Ticker, telegram size
+	private static final int EMSPKG_EOD_SIZE= 4;		// crc, brk, 0xe51a
+	private static final int EMSPKG_MIN_SIZE= 3;		// minimum size we'll care about 
+	
 
 	public static String bytesToHex(int[] data, int offset, int count, boolean separator) {
 		
 		char[] hexChars = new char[count * 3];
 		for (int j = 0; j < count; j++) {
 			int v = data[j + offset] & 0xFF;
-			hexChars[j * 3] 	= hexArray[v >>> 4];
-			hexChars[j * 3 + 1] = hexArray[v & 0x0F];
+			hexChars[j * 3] 	= HEXARRAY[v >>> 4];
+			hexChars[j * 3 + 1] = HEXARRAY[v & 0x0F];
 			hexChars[j * 3 + 2] = ' ';
 		}
 		return new String(hexChars);
@@ -64,18 +70,15 @@ public class EmsBus {
 		this.debugLevel = debug;
 	}
 
-	public EmsBus(String emsServer, int emsPort) {
+	public EmsSyslog(String emsServer, int emsPort) {
 		this.emsServer = emsServer;
 		this.emsPort = emsPort;
-
 		this.skt = null;
-
 	}
 
 	public void open() throws IOException {
 		skt = new Socket();
-		skt.connect(new InetSocketAddress(emsServer, emsPort),
-				socketConnectTimeout);
+		skt.connect(new InetSocketAddress(emsServer, emsPort), socketConnectTimeout);
 		skt.setSoTimeout(socketDataTimeout);
 		in = new BufferedInputStream(skt.getInputStream());
 	}
@@ -117,73 +120,76 @@ public class EmsBus {
 	
 	public int[] getTelegramm() throws IOException {
 		try {
-
 			if (!isConnected()) {
 				syslog.notice("connecting to " + emsServer + ":" + emsPort);
 				open();
 			}
 
 			try {
-				int pkgLen;
+				int rawPkgLength;
 				int payloadLength;
 				
 				long sntpTimestamp;
 				long sysTimestamp;
-				int length;
+				int emsPkgLength;
+				
+				String rawMsg;
+				
 				do {
-					pkgLen = 0;
-					
+					rawPkgLength = 0;
+
 					// read protocol header
-					for (; pkgLen < 10; pkgLen++)
-						data[pkgLen] = fetchByte();
+					for (; rawPkgLength < 10; rawPkgLength++)
+						data[rawPkgLength] = fetchByte();
 					
-					// convert ESP to native
-					sntpTimestamp = data[3] << 24 | data[2] << 16 | data[1] << 8  | data[0] << 0;
-					
-					sysTimestamp = data[7] << 24  | data[6] << 16 | data[5] << 8  | data[4] << 0;
-					
-					length = data[9] << 8	| data[8] << 0;
+					// pick package length from pkgHeader
+					emsPkgLength  = (data[9] << 8	| data[8] << 0) & 0xFFFF;
+					for (; rawPkgLength < EMSPKG_HEADER_SIZE + emsPkgLength; rawPkgLength++)
+						data[rawPkgLength] = fetchByte();
 
-					// read the payload
-					for (; pkgLen < 10 + length; pkgLen++)
-						data[pkgLen] = fetchByte();
-
-					if ((data[pkgLen - 2] != 0xe5) && (data[pkgLen - 1] != 0x1a)) {
+					// create debug message from raw package
+					sntpTimestamp = (data[3] << 24 | data[2] << 16 | data[1] << 8  | data[0] << 0) & 0xFFFFFFFF;
+					sysTimestamp  = (data[7] << 24  | data[6] << 16 | data[5] << 8  | data[4] << 0) & 0xFFFFFFFF;
+					
+					rawMsg = String.format("0x%08x 0x%08x %3d ", sntpTimestamp, sysTimestamp, emsPkgLength) 
+									+ " " 
+									+ bytesToHex(data, 0, rawPkgLength, true);
+					
+					// validate incoming data
+					if ((data[rawPkgLength - 2] != 0xe5) && (data[rawPkgLength - 1] != 0x1a)) {
 						if (debugLevel >= 1) {
 							syslog.warn("missing end of frame signature");
+							syslog.warn(rawMsg);
 						}
-						// receive bytes until frame end has been seen again
 						waitForEndOfFrame();
 						return null;
 					}
 
-					// if(debug) System.out.printf("0x%08x 0x%08x %3d ",
-					// sntpTimestamp, sysTimestamp, length);
-
-					if (length != pkgLen - 10) {
+					if (emsPkgLength != rawPkgLength - EMSPKG_HEADER_SIZE) {
 						if (debugLevel >= 1) {
-							syslog.warn(String.format("length mismatch: %d vs %d", length, pkgLen));
+							syslog.warn(String.format("length mismatch: %d vs %d", emsPkgLength, rawPkgLength));
+							syslog.warn(rawMsg);
 						}
 						waitForEndOfFrame();
 						return null;
 					}
-					payloadLength = pkgLen - 14;
-				} while (payloadLength < 3);
+					payloadLength = rawPkgLength - (EMSPKG_HEADER_SIZE + EMSPKG_EOD_SIZE);
+				} while (payloadLength < EMSPKG_MIN_SIZE);
 
-				int crc = buderusEmsCrc(data, 10, 10 + payloadLength);
+				int crc = buderusEmsCrc(data, EMSPKG_HEADER_SIZE, EMSPKG_HEADER_SIZE + payloadLength);
 
 				// show incoming frame on crc mismatch
-				if (debugLevel >= 2 || (crc != data[10 + payloadLength])) {
-					syslog.warn(String.format("0x%08x 0x%08x %3d ", sntpTimestamp, sysTimestamp, length));
-					syslog.warn(bytesToHex(data, 0, length + 10, true));
-					if (crc != data[10 + payloadLength])
-						syslog.warn(String.format("CRC mismatch: %02x vs %02x length %d\n", crc,
-								data[10 + payloadLength], payloadLength));
-					else
+				if (debugLevel >= 2 || (crc != data[EMSPKG_HEADER_SIZE + payloadLength])) {
+					if (crc != data[EMSPKG_HEADER_SIZE + payloadLength]) {
+						syslog.warn(String.format("CRC mismatch: %02x vs %02x", crc, data[EMSPKG_HEADER_SIZE + payloadLength]));
+						syslog.warn(rawMsg);
+					} else {
 						syslog.debug(String.format("computed CRC: %02x", crc));
+						syslog.debug(rawMsg);
+					}
 				}
 
-				if (crc != data[10 + payloadLength]) {
+				if (crc != data[EMSPKG_HEADER_SIZE + payloadLength]) {
 					waitForEndOfFrame();
 					return null;
 				}
@@ -191,14 +197,13 @@ public class EmsBus {
 				int telegram[] = new int[payloadLength];
 
 				for (int j = 0; j < payloadLength; j++) {
-					telegram[j] = (byte) data[j + 10];
+					telegram[j] = (byte) data[j + EMSPKG_HEADER_SIZE];
 				}
 
 				return telegram;
 				
 			} catch (SocketTimeoutException e) {
-				throw new IOException("Data Timeout after " + byteCount
-						+ " bytes");
+				throw new IOException("Data Timeout after " + byteCount + " bytes");
 			}
 
 		} catch (IOException e) {
@@ -268,11 +273,11 @@ public class EmsBus {
 	public static void main(String args[]) {
 		int[] b;
 
-		EmsBus emsBus = new EmsBus(args.length > 0 ? args[0] : "192.168.254.115", 23);
+		EmsSyslog emsBus = new EmsSyslog(args.length > 0 ? args[0] : "192.168.254.115", 23);
 		SyslogConfigIF config = Syslog.getInstance("udp").getConfig(); // create the Syslog config
 
 		config.setHost(args.length > 1 ? args[1] : syslogServer); 	// Diskstation is running the syslog daemon
-		config.setPort(syslogPort); 	// default syslog port
+		config.setPort(syslogPort); 								// default syslog port
 		config.setIdent("EMSLink");
 		config.setLocalName("ems-link");
 		config.setSendLocalName(true);
