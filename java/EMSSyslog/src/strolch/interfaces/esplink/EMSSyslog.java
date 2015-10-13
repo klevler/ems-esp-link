@@ -14,8 +14,8 @@ import java.util.Date;
 import org.productivity.java.syslog4j.*; // http://www.syslog4j.org/
 
 class EMSPktHeader {
-	public int sntpTimestamp= 0;	// SNTP timestamp from EMSLink
-	public int espTickCount = 0;	// ESP8266 system ticker (1ms)
+	public long sntpTimestamp= 0;	// SNTP timestamp from EMSLink
+	public long espTickCount = 0;	// ESP8266 system ticker (1ms)
 	public int emsPkgLength = 0;
 	
 	// validate EMSLink package header
@@ -29,7 +29,7 @@ class EMSPktHeader {
 	public String toString() {
 		SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yy H:mm:ss"); 
 		return new String(String.format("%s %d.%03d [%d] ",
-				  			sdf.format(new Date(this.sntpTimestamp)),
+				  			sdf.format(new Date(this.sntpTimestamp * 1000)),	// to millis...
 				  			this.espTickCount / 1000, 
 				  			this.espTickCount % 1000,
 				  			this.emsPkgLength));
