@@ -167,9 +167,9 @@ public class EMSSyslog {
 					eph.sntpTimestamp= (data[3] << 24 | data[2] << 16 | data[1] << 8  | data[0] << 0) & 0xFFFFFFFF;
 					eph.espTickCount = (data[7] << 24 | data[6] << 16 | data[5] << 8  | data[4] << 0) & 0xFFFFFFFF;
 					
-					// must check emsPkgLength - max 128 bytes..
-					if (eph.emsPkgLength > data.length) {
-						syslog.error("invalid EMS package length " + eph.emsPkgLength);
+					// validate package header
+					if (! eph.validate()) {
+						syslog.error("invalid EMS package header");
 						syslog.error(eph.toString() + bytesToHex(data, 0, rawPkgLength, true));
 						waitForEndOfFrame();
 						return null;
