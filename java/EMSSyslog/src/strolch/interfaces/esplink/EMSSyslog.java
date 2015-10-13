@@ -9,8 +9,32 @@ package strolch.interfaces.esplink;
 //import java.lang.*;
 import java.io.*;
 import java.net.*;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import org.productivity.java.syslog4j.*; // http://www.syslog4j.org/
+
+class EMSPktHeader {
+	public int sntpTimestamp= 0;	// SNTP timestamp from EMSLink
+	public int espTickCount = 0;	// ESP8266 system ticker (1ms)
+	public int emsPkgLength = 0;
+	
+	// validate EMSLink package header
+	public boolean validate() {
+		if (this.emsPkgLength > 128 || this.emsPkgLength < 2)
+			return false;
+		return true;
+	}
+	
+	// convert package header to String
+	public String toString() {
+		SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yy H:mm:ss"); 
+		return new String(String.format("%s %d.%03d [%d] ",
+				  			sdf.format(new Date(this.sntpTimestamp)),
+				  			this.espTickCount / 1000, 
+				  			this.espTickCount % 1000,
+				  			this.emsPkgLength));
+	}
+}
 
 public class EMSSyslog {
 
@@ -118,21 +142,18 @@ public class EMSSyslog {
 	}
 	
 	public int[] getTelegramm() throws IOException {
+		
 		try {
 			if (!isConnected()) {
 				syslog.notice("connecting to " + emsServer + ":" + emsPort);
 				open();
 			}
 
+			EMSPktHeader eph = new EMSPktHeader();
+			
 			try {
 				int rawPkgLength;
 				int payloadLength;
-				
-				long sntpTimestamp;
-				long sysTimestamp;
-				int emsPkgLength;
-				
-				String rawMsg;
 				
 				do {
 					rawPkgLength = 0;
@@ -142,39 +163,36 @@ public class EMSSyslog {
 						data[rawPkgLength] = fetchByte();
 					
 					// pick package length from pkgHeader
-					emsPkgLength  = (data[9] << 8	| data[8] << 0) & 0xFFFF;
+					eph.emsPkgLength = (data[9] << 8  | data[8] << 0) & 0xFFFF;
+					eph.sntpTimestamp= (data[3] << 24 | data[2] << 16 | data[1] << 8  | data[0] << 0) & 0xFFFFFFFF;
+					eph.espTickCount = (data[7] << 24 | data[6] << 16 | data[5] << 8  | data[4] << 0) & 0xFFFFFFFF;
 					
 					// must check emsPkgLength - max 128 bytes..
-					if (emsPkgLength > data.length) {
-						syslog.error("invalid EMS package length " + emsPkgLength);
+					if (eph.emsPkgLength > data.length) {
+						syslog.error("invalid EMS package length " + eph.emsPkgLength);
+						syslog.error(eph.toString() + bytesToHex(data, 0, rawPkgLength, true));
 						waitForEndOfFrame();
 						return null;
 					}
-					for (; rawPkgLength < EMSPKG_HEADER_SIZE + emsPkgLength; rawPkgLength++)
+					
+					// fetch payload data
+					for (; rawPkgLength < EMSPKG_HEADER_SIZE + eph.emsPkgLength; rawPkgLength++)
 						data[rawPkgLength] = fetchByte();
 
-					// create debug message from raw package
-					sntpTimestamp = (data[3] << 24 | data[2] << 16 | data[1] << 8  | data[0] << 0) & 0xFFFFFFFF;
-					sysTimestamp  = (data[7] << 24  | data[6] << 16 | data[5] << 8  | data[4] << 0) & 0xFFFFFFFF;
-					
-					rawMsg = String.format("0x%08x 0x%08x %3d ", sntpTimestamp, sysTimestamp, emsPkgLength) 
-									+ " " 
-									+ bytesToHex(data, 0, rawPkgLength, true);
-					
 					// validate incoming data
 					if ((data[rawPkgLength - 2] != 0xe5) && (data[rawPkgLength - 1] != 0x1a)) {
 						if (debugLevel >= 1) {
 							syslog.error("missing end of frame signature");
-							syslog.warn(rawMsg);
+							syslog.error(eph.toString() + bytesToHex(data, 0, rawPkgLength, true));
 						}
 						waitForEndOfFrame();
 						return null;
 					}
 
-					if (emsPkgLength != rawPkgLength - EMSPKG_HEADER_SIZE) {
+					if (eph.emsPkgLength != rawPkgLength - EMSPKG_HEADER_SIZE) {
 						if (debugLevel >= 1) {
-							syslog.error(String.format("length mismatch: %d vs %d", emsPkgLength, rawPkgLength));
-							syslog.warn(rawMsg);
+							syslog.error(String.format("length mismatch: %d vs %d", eph.emsPkgLength, rawPkgLength));
+							syslog.error(eph.toString() + bytesToHex(data, 0, rawPkgLength, true));
 						}
 						waitForEndOfFrame();
 						return null;
@@ -188,10 +206,10 @@ public class EMSSyslog {
 				if (debugLevel >= 2 || (crc != data[EMSPKG_HEADER_SIZE + payloadLength])) {
 					if (crc != data[EMSPKG_HEADER_SIZE + payloadLength]) {
 						syslog.error(String.format("CRC mismatch: %02x vs %02x", crc, data[EMSPKG_HEADER_SIZE + payloadLength]));
-						syslog.warn(rawMsg);
+						syslog.error(eph.toString() + bytesToHex(data, 0, rawPkgLength, true));
 					} else {
 						syslog.debug(String.format("computed CRC: %02x", crc));
-						syslog.debug(rawMsg);
+						syslog.debug(eph.toString() + bytesToHex(data, 0, rawPkgLength, true));
 					}
 				}
 
@@ -209,16 +227,15 @@ public class EMSSyslog {
 				return telegram;
 				
 			} catch (SocketTimeoutException e) {
-				throw new IOException("Data Timeout after " + byteCount + " bytes");
+				throw new IOException("timeout after " + byteCount + " bytes");
 			}
 
 		} catch (IOException e) {
 			close();
-			syslog.warn(String.format("connection closed: %s", e.toString()));
+			syslog.emergency(String.format("connection closed: %s", e.toString()));
 			byteCount = 0;
 			throw e;
 		}
-
 	}
 
 	private final static boolean buderusEmsCrcTable = false;
