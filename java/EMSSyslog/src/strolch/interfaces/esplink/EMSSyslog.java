@@ -107,7 +107,6 @@ public class EMSSyslog {
 			if (c < 0)
 				throw new IOException("End of input stream");
 		} while ((lastC != 0xe5) && (c != 0x1a));
-
 	}
 
 	public int fetchByte() throws IOException {
@@ -144,6 +143,13 @@ public class EMSSyslog {
 					
 					// pick package length from pkgHeader
 					emsPkgLength  = (data[9] << 8	| data[8] << 0) & 0xFFFF;
+					
+					// must check emsPkgLength - max 128 bytes..
+					if (emsPkgLength > data.length) {
+						syslog.error("invalid EMS package length " + emsPkgLength);
+						waitForEndOfFrame();
+						return null;
+					}
 					for (; rawPkgLength < EMSPKG_HEADER_SIZE + emsPkgLength; rawPkgLength++)
 						data[rawPkgLength] = fetchByte();
 
@@ -158,7 +164,7 @@ public class EMSSyslog {
 					// validate incoming data
 					if ((data[rawPkgLength - 2] != 0xe5) && (data[rawPkgLength - 1] != 0x1a)) {
 						if (debugLevel >= 1) {
-							syslog.warn("missing end of frame signature");
+							syslog.error("missing end of frame signature");
 							syslog.warn(rawMsg);
 						}
 						waitForEndOfFrame();
@@ -167,7 +173,7 @@ public class EMSSyslog {
 
 					if (emsPkgLength != rawPkgLength - EMSPKG_HEADER_SIZE) {
 						if (debugLevel >= 1) {
-							syslog.warn(String.format("length mismatch: %d vs %d", emsPkgLength, rawPkgLength));
+							syslog.error(String.format("length mismatch: %d vs %d", emsPkgLength, rawPkgLength));
 							syslog.warn(rawMsg);
 						}
 						waitForEndOfFrame();
@@ -181,7 +187,7 @@ public class EMSSyslog {
 				// show incoming frame on crc mismatch
 				if (debugLevel >= 2 || (crc != data[EMSPKG_HEADER_SIZE + payloadLength])) {
 					if (crc != data[EMSPKG_HEADER_SIZE + payloadLength]) {
-						syslog.warn(String.format("CRC mismatch: %02x vs %02x", crc, data[EMSPKG_HEADER_SIZE + payloadLength]));
+						syslog.error(String.format("CRC mismatch: %02x vs %02x", crc, data[EMSPKG_HEADER_SIZE + payloadLength]));
 						syslog.warn(rawMsg);
 					} else {
 						syslog.debug(String.format("computed CRC: %02x", crc));
