@@ -10,3 +10,13 @@ html_compressed/
 esp-link.tgz
 tve-patch/
 yui
+tools/*compressor*.jar
+.gitignore
+
+# ignore IDE specific files
+java/.metadata/
+java/EMSSyslog/.*
+java/RemoteSystemsTempFiles/.*
+
+# ignore local config file
+local.conf
