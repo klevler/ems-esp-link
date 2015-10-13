@@ -27,7 +27,7 @@ class EMSPktHeader {
 	
 	// convert package header to String
 	public String toString() {
-		SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yy H:mm:ss"); 
+		SimpleDateFormat sdf = new SimpleDateFormat("yy-MM-dd H:mm:ss"); 
 		return new String(String.format("%s %d.%03d [%d] ",
 				  			sdf.format(new Date(this.sntpTimestamp * 1000)),	// to millis...
 				  			this.espTickCount / 1000, 
@@ -158,14 +158,19 @@ public class EMSSyslog {
 				do {
 					rawPkgLength = 0;
 
-					// read protocol header
-					for (; rawPkgLength < 10; rawPkgLength++)
+					// *** read protocol header
+					// int res = in.read(byte[] ba, 0, EMSPKG_HEADER_SIZE);
+					// if (res < 0)
+					//   throw new IOException("End of input stream");
+					// byteCount += EMSPKG_HEADER_SIZE;
+
+					for (; rawPkgLength < EMSPKG_HEADER_SIZE; rawPkgLength++)
 						data[rawPkgLength] = fetchByte();
 					
 					// pick package length from pkgHeader
-					eph.emsPkgLength = (data[9] << 8  | data[8] << 0) & 0xFFFF;
-					eph.sntpTimestamp= (data[3] << 24 | data[2] << 16 | data[1] << 8  | data[0] << 0) & 0xFFFFFFFF;
-					eph.espTickCount = (data[7] << 24 | data[6] << 16 | data[5] << 8  | data[4] << 0) & 0xFFFFFFFF;
+					eph.emsPkgLength = ((data[9] & 0xFF) << 8  | (data[8] & 0xFF) << 0);
+					eph.sntpTimestamp= ((data[3] & 0xFF) << 24 | (data[2] & 0xFF) << 16 | (data[1] & 0xFF) << 8  | (data[0] & 0xFF) << 0);
+					eph.espTickCount = ((data[7] & 0xFF) << 24 | (data[6] & 0xFF) << 16 | (data[5] & 0xFF) << 8  | (data[4] & 0xFF) << 0);
 					
 					// validate package header
 					if (! eph.validate()) {
