@@ -413,25 +413,17 @@ public class EMSSyslog {
 
 		EMSSyslog emsBus = new EMSSyslog(args.length > 0 ? args[0]
 				: "192.168.254.115", 23);
-		SyslogConfigIF config = Syslog.getInstance("udp").getConfig(); // create
-																		// the
-																		// Syslog
-																		// config
+		SyslogConfigIF config = Syslog.getInstance("udp").getConfig();		// create the Syslog config
 
-		config.setHost(args.length > 1 ? args[1] : emsBus.syslogServer); // Diskstation
-																			// is
-																			// running
-																			// the
-																			// syslog
-																			// daemon
+		config.setHost(args.length > 1 ? args[1] : emsBus.syslogServer);	// Diskstation is running the syslog daemon
 		config.setPort(emsBus.syslogPort); // default syslog port
-		config.setIdent("EMSLink");
-		// config.setLocalName("ems-link");
+		config.setIdent("EMSSyslog");
 		config.setSendLocalName(true);
+		// config.setLocalName("ems-link");
 
 		Syslog.createInstance("EMSBus", config);
 		syslog = Syslog.getInstance("EMSBus"); // create a syslog instance
-		syslog.notice("starting EMSLink monitor");
+		syslog.notice("starting EMSBus monitor");
 
 		long startUp = System.currentTimeMillis();
 
@@ -448,6 +440,8 @@ public class EMSSyslog {
 				if (b != null) {
 					if (b.length > 0)
 						syslog.info(bytesToHex(b));
+					//	else
+					//		don't show the Poll Requests...
 				}
 			} catch (IOException e) {
 				System.out.println(e.toString());
