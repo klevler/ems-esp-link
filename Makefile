@@ -33,8 +33,9 @@ XTENSA_TOOLS_ROOT ?= $(abspath ../esp-open-sdk/xtensa-lx106-elf/bin)/
 
 # Base directory of the ESP8266 SDK package, absolute
 # Typically you'll download from Espressif's BBS, http://bbs.espressif.com/viewforum.php?f=5
-SDK_BASE	?= $(abspath ../esp_iot_sdk_v1.5.1)
-BOOTFILE	?= $(abspath ../esp_iot_sdk_v1.5.1/bin/boot_v1.5.bin)
+SDK_BASE	?= $(abspath ../esp_iot_sdk_v1.5.0)
+# BOOTFILE	= /bin/boot_v1.4(b1).bin
+BOOTFILE	= /bin/boot_v1.5.bin
 
 # Esptool.py path and port, only used for 1-time serial flashing
 # Typically you'll use https://github.com/themadinventor/esptool
@@ -76,7 +77,7 @@ LED_SERIAL_PIN      ?= 14
 CHANGE_TO_STA ?= yes
 
 # Optional Modules
-MODULES ?= mqtt rest syslog
+MODULES ?= mqtt rest syslog ems
 
 # --------------- esphttpd config options ---------------
 
@@ -349,7 +350,7 @@ baseflash: all
 
 flash: all
 	$(Q) $(ESPTOOL) --port $(ESPPORT) --baud $(ESPBAUD) write_flash -fs $(ET_FS) -ff $(ET_FF) \
-	  0x00000 "$(BOOTFILE)" 0x01000 $(FW_BASE)/user1.bin \
+	  0x00000 "$(SDK_BASE)$(BOOTFILE)" 0x01000 $(FW_BASE)/user1.bin \
 	  $(ET_BLANK) $(SDK_BASE)/bin/blank.bin
 
 tools/$(HTML_COMPRESSOR):
@@ -429,7 +430,7 @@ release: all
 	$(Q) egrep -a 'esp-link [a-z0-9.]+ - 201' $(FW_BASE)/user1.bin | cut -b 1-80
 	$(Q) egrep -a 'esp-link [a-z0-9.]+ - 201' $(FW_BASE)/user2.bin | cut -b 1-80
 	$(Q) cp $(FW_BASE)/user1.bin $(FW_BASE)/user2.bin $(SDK_BASE)/bin/blank.bin \
-		   "$(BOOTFILE)" wiflash avrflash release/esp-link-$(BRANCH)
+		   "$(SDK_BASE)$(BOOTFILE)" wiflash avrflash release/esp-link-$(BRANCH)
 	$(Q) tar zcf esp-link-$(BRANCH).tgz -C release esp-link-$(BRANCH)
 	$(Q) echo "Release file: esp-link-$(BRANCH).tgz"
 	$(Q) rm -rf release
