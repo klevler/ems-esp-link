@@ -41,6 +41,8 @@ void ets_timer_setfn(ETSTimer *t, ETSTimerFunc *fn, void *parg);
 
 void ets_update_cpu_frequency(int freqmhz);
 
+int ets_char2xdigit (char c);       // return hex_nipple(c)|-1 c: {0-9,a-f,A-F}
+
 #ifdef SDK_DBG
 #define DEBUG_SDK true
 #else
