@@ -27,9 +27,9 @@ LOCAL os_task_t  *usr_task_queue = NULL;	// user task queue
 // it seems save to run the usr_event_handler from RAM, so no ICACHE_FLASH_ATTR here...
 LOCAL void usr_event_handler(os_event_t *e)
 {
-  DBG("usr_event_handler: event %p (sig=%d, par=%p)\n", e, (int)e->sig, (void *)e->par);
+  DBG("%s: event %p (sig=%d, par=%p)\n", __FUNCTION__, e, (int)e->sig, (void *)e->par);
   if (usr_task_queue[e->sig] == NULL || e->sig < 0 || e->sig >= MAXUSRTASKS) {
-    os_printf("usr_event_handler: task %d %s\n", (int)e->sig,
+    os_printf("%s: task %d %s\n", __FUNCTION__, (int)e->sig,
 	       usr_task_queue[e->sig] == NULL ? "not registered" : "out of range");
     return;
   }
