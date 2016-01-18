@@ -20,8 +20,12 @@ class EMSPktHandler {
 	long espTickCount = 0; // ESP8266 system ticker (1ms)
 	int pkgLength = 0;
 
+    int uart_int_st = 0;
+    int uart_int_raw = 0;
+	
 	ByteBuffer header = null;
 	int headerLength;
+    boolean headerV2 = false;
 
 	ByteBuffer payload = null;
 	int payloadLength;
@@ -32,7 +36,6 @@ class EMSPktHandler {
 
 		payload = ByteBuffer.allocate(256);
 		payload.order(java.nio.ByteOrder.BIG_ENDIAN); // EMS is big endian
-
 	}
 
 	/* --- setters / getters --- */
@@ -77,16 +80,29 @@ class EMSPktHandler {
 	/* --- procedures --- */
 	public void fillPkgHeader(BufferedInputStream bis) throws IOException {
 		this.header.clear();
-		headerLength = bis.read(this.header.array(), 0, this.header.limit()); // carefull
-																				// -
-																				// check
-																				// size!
+		headerLength = bis.read(this.header.array(), 0, EMSSyslog.EMSPKG_HEADERV1_SIZE);	// V1 header size
 		if (headerLength == -1)
 			throw new IOException("end of input stream");
 
-		this.sntpTimestamp = this.header.getInt(0);
-		this.espTickCount = this.header.getInt(4);
-		this.pkgLength = this.header.getShort(8);
+        headerV2 = header.get(0) == 85 && header.get(1) == -86;
+        if(headerV2)
+        {
+            header.getShort();
+            uart_int_raw = header.get() & 0xff;
+            uart_int_st = header.get() & 0xff;
+
+            if(-1 == bis.read(header.array(), EMSSyslog.EMSPKG_HEADERV1_SIZE, 4))
+                throw new IOException("End of input stream V2");
+            header.position(4);
+        } else
+        	header.position(0);
+        
+        sntpTimestamp = header.getInt();
+        espTickCount = header.getInt();
+        pkgLength = header.getShort();
+        
+//		System.out.printf("sntpTimestamp: %x, espTickCount: %x, pkgLength: %x, uart_int_raw=%x, uart_int_st=%x\n", 
+//						sntpTimestamp,espTickCount,pkgLength, uart_int_raw, uart_int_st);
 	}
 
 	public void fillPkgPayload(BufferedInputStream bis) throws IOException {
@@ -100,26 +116,29 @@ class EMSPktHandler {
 
 	// validate EMSLink package header
 	public boolean validatePkgHeader() {
-		if (this.pkgLength > 128 || this.pkgLength < 2)
-			return false;
-		return true;
+        return pkgLength <= 128 && pkgLength >= 2;
 	}
 
 	public boolean validatePkgPayload() {
-		if (this.pkgLength > 128 || this.pkgLength < 2)
-			return false;
-		return true;
+        return pkgLength <= 128 && pkgLength >= 2;
 	}
 
-	// convert package header to String
+    public long getTickCountms()
+    {
+        return 0xffffffffL & (espTickCount + 500L) / 1000L;
+    }
+
+    // convert package header to String
 	public String toString() {
-		SimpleDateFormat sdf = new SimpleDateFormat("yy-MM-dd H:mm:ss");
-		return new String(String.format(
-				"%s %d.%03d {%d} ",
-				sdf.format(new Date(this.sntpTimestamp * 1000)), // to millis...
-				(this.espTickCount & 0xFFFFFFFFL) / 1000,
-				(this.espTickCount & 0xFFFFFFFFL) % 1000,
-				this.pkgLength));
+        SimpleDateFormat sdf = new SimpleDateFormat("yy-MM-dd H:mm:ss");
+        if(headerV2)
+            return new String(String.format("%s %d.%03d %02x %02x {%d} ", new Object[] {
+                sdf.format(new Date(sntpTimestamp * 1000L)), Long.valueOf((espTickCount & 0xffffffffL) / 1000L), Long.valueOf((espTickCount & 0xffffffffL) % 1000L), Integer.valueOf(uart_int_raw), Integer.valueOf(uart_int_st), Integer.valueOf(pkgLength)
+            }));
+        else
+            return new String(String.format("%s %d.%03d {%d} ", new Object[] {
+                sdf.format(new Date(sntpTimestamp * 1000L)), Long.valueOf((espTickCount & 0xffffffffL) / 1000L), Long.valueOf((espTickCount & 0xffffffffL) % 1000L), Integer.valueOf(pkgLength)
+            }));
 	}
 
 }
@@ -129,8 +148,10 @@ public class EMSSyslog {
 	final protected static char[] HEXARRAY = "0123456789ABCDEF".toCharArray();
 
 	// convenience...
-	static final int EMSPKG_HEADER_SIZE = 10; // Timestamp, ESP Ticker, telegram
-												// size
+	
+	static final int EMSPKG_HEADERV1_SIZE = 10; // Timestamp, ESP Ticker, telegram size
+	static final int EMSPKG_HEADER_SIZE = 14;   // 55AA, Timestamp, ESP Ticker, telegram size
+	
 	static final int EMSPKG_EOD_SIZE = 4; // crc, brk, 0xe51a
 	static final int EMSPKG_MIN_SIZE = 3; // minimum size we'll care about
 
