@@ -10,6 +10,7 @@ package strolch.interfaces.esplink;
 import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import org.productivity.java.syslog4j.*; // http://www.syslog4j.org/
@@ -408,45 +409,152 @@ public class EMSSyslog {
 	 * args[1]: EMS-ESP-Link Gateway args[2]: Syslog-Server
 	 */
 
-	public static void main(String args[]) {
-		byte[] b;
-
-		EMSSyslog emsBus = new EMSSyslog(args.length > 0 ? args[0]
-				: "192.168.254.115", 23);
-		SyslogConfigIF config = Syslog.getInstance("udp").getConfig();		// create the Syslog config
-
-		config.setHost(args.length > 1 ? args[1] : emsBus.syslogServer);	// Diskstation is running the syslog daemon
-		config.setPort(emsBus.syslogPort); // default syslog port
-		config.setIdent("EMSSyslog");
-		config.setSendLocalName(true);
-		// config.setLocalName("ems-link");
-
-		Syslog.createInstance("EMSBus", config);
-		syslog = Syslog.getInstance("EMSBus"); // create a syslog instance
-		syslog.notice("starting EMSBus monitor");
-
-		long startUp = System.currentTimeMillis();
-
-		while (true) {
-			try {
-				// first 10 sec in debug mode
-				if ((emsBus.getDebugLevel() > 0)
-						&& (System.currentTimeMillis() - startUp > 10000)) {
-					emsBus.setDebugLevel(0);
-					syslog.notice("decreasing debugLevel to 0");
-				}
-
-				b = emsBus.getTelegramm();
-				if (b != null) {
-					if (b.length > 0)
-						syslog.info(bytesToHex(b));
-					//	else
-					//		don't show the Poll Requests...
-				}
-			} catch (IOException e) {
-				System.out.println(e.toString());
-				syslog.error(e.toString());
-			}
-		}
-	}
+    public static void main(String args[])
+    {
+        EMSSyslog emsBus = new EMSSyslog(args.length <= 0 ? "192.168.254.115" : args[0], 23);
+        SyslogConfigIF config = Syslog.getInstance("udp").getConfig();
+        config.setHost(args.length <= 1 ? emsBus.syslogServer : args[1]);
+        config.setPort(emsBus.syslogPort);
+        config.setIdent(args.length <= 2 ? "EMSSyslog" : args[2]);
+        config.setSendLocalName(true);
+        if(args.length > 3)
+            config.setLocalName(args[3]);
+        Syslog.createInstance("EMSBus", config);
+        syslog = Syslog.getInstance("EMSBus");
+        syslog.notice("starting EMSBus monitor");
+        long showDbg = 10000L;
+        long startUp = System.currentTimeMillis();
+        do
+        {
+            try
+            {
+                do
+                {
+                    ByteBuffer bb;
+                    do
+                    {
+                        byte b[];
+                        do
+                            if(emsBus.getDebugLevel() > 0 && System.currentTimeMillis() - startUp > showDbg)
+                            {
+                                emsBus.setDebugLevel(0);
+                                syslog.notice("decreasing debugLevel to 0");
+                            }
+                        while((b = emsBus.getTelegramm()) == null);
+                        bb = ByteBuffer.wrap(b);
+                        bb.order(ByteOrder.BIG_ENDIAN);
+                    } while(bb.limit() < 6);
+                    bb.position(0);
+                    if(bb.get(0) == 8 && bb.get(1) == 0 && bb.get(2) == 25)
+                    {
+                        int tAussen = bb.getShort(4);
+                        int tKessel = bb.getShort(6);
+                        int tAbgas = bb.getShort(8);
+                        int modulation = bb.get(13);
+                        int brennerStart = 0xffffff & bb.getInt(13);
+                        int betriebsDauer = 0xffffff & bb.getInt(16);
+                        int heizDauer = 0xffffff & bb.getInt(22);
+                        syslog.notice(String.format("UBAMonitorSlow: %c%3d.%1d %3d.%1d %3d.%1d %2d%c %6d %6d:%02d %6d:%02d\n", new Object[] {
+							tAussen > 0 ? '+' : '-',
+                            Integer.valueOf(Math.abs(tAussen) / 10), Integer.valueOf(Math.abs(tAussen) % 10),
+                            Integer.valueOf(tKessel / 10), Integer.valueOf(tKessel % 10),
+                            Integer.valueOf(tAbgas / 10), Integer.valueOf(tAbgas % 10),
+                            Integer.valueOf(modulation),
+                            Character.valueOf('%'),
+                            Integer.valueOf(brennerStart),
+                            Integer.valueOf(betriebsDauer / 60), Integer.valueOf(betriebsDauer % 60),
+                            Integer.valueOf(heizDauer / 60), Integer.valueOf(heizDauer % 60)
+                        }));
+                    } else
+                    if(bb.get(0) == 16 && bb.get(1) == 0 && bb.get(2) == 6)
+                        syslog.notice(String.format("RCTimeMessage: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 7)
+                        syslog.notice(String.format("UBAUnknown 1: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 16)
+                        syslog.notice(String.format("UBAErrorMessages1: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 17)
+                        syslog.notice(String.format("UBAErrorMessages2: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 18)
+                        syslog.error(String.format("RCErrorMessages: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 19)
+                        syslog.error(String.format("RCDeletedErrorMessages: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 20)
+                        syslog.notice(String.format("UBABetriebszeit: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 21)
+                        syslog.notice(String.format("UBAWartungsdaten: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 22)
+                        syslog.notice(String.format("UBABetriebszeitMC10Parameter: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 24)
+                        syslog.notice(String.format("UBAMonitorFast: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 26)
+                        syslog.notice(String.format("UBASollwerte: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 28)
+                        syslog.notice(String.format("UBAWartungsmeldungen: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if(bb.get(2) == 62)
+                        syslog.notice(String.format("HK1MonitorMessage: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                    if((bb.get(2) & 0xff) == 163)
+                        syslog.notice(String.format("RCOutdoorTempMessage: %s", new Object[] {
+                            bytesToHex(bb.array())
+                        }));
+                    else
+                        syslog.info(bytesToHex(bb.array()));
+                } while(true);
+            }
+            catch(IOException e)
+            {
+                System.out.println(e.toString());
+            }
+            try
+            {
+                Thread.currentThread();
+                Thread.sleep(30000L);
+            }
+            catch(InterruptedException e1)
+            {
+                e1.printStackTrace();
+            }
+            emsBus.setDebugLevel(2);
+            showDbg = 5000L;
+            startUp = System.currentTimeMillis();
+        } while(true);
+    }
 }
