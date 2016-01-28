@@ -17,7 +17,7 @@
 extern void * mem_trim(void *m, size_t s);	// not well documented...
 
 #ifdef SYSLOG_DBG
-#define DBG(format, ...) do { os_printf(format, ## __VA_ARGS__); } while(0)
+#define DBG(format, ...) os_printf(format, ## __VA_ARGS__)
 #else
 #define DBG(format, ...) do { } while(0)
 #endif
@@ -364,7 +364,8 @@ syslog_add_entry(syslog_entry_t *entry)
       pse = pse->next;
     pse->next = entry;	// append msg to syslog queue
   }
-  DBG("%p %lu %d %s\n", entry, entry->msgid, system_get_free_heap_size(), entry->datagram);
+  // Debug: show queue addr, current msgid, avail. heap and syslog datagram
+  // DBG("%p %lu %d %s\n", entry, entry->msgid, system_get_free_heap_size(), entry->datagram);
 
   // ensure we have sufficient heap for the rest of the system
   if (system_get_free_heap_size() < syslogHost.min_heap_size) {
