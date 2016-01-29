@@ -22,7 +22,7 @@ class EMSPktHandler {
 
     int uart_int_st = 0;
     int uart_int_raw = 0;
-	
+
 	ByteBuffer header = null;
 	int headerLength;
     boolean headerV2 = false;
@@ -96,12 +96,12 @@ class EMSPktHandler {
             header.position(4);
         } else
         	header.position(0);
-        
+
         sntpTimestamp = header.getInt();
         espTickCount = header.getInt();
         pkgLength = header.getShort();
-        
-//		System.out.printf("sntpTimestamp: %x, espTickCount: %x, pkgLength: %x, uart_int_raw=%x, uart_int_st=%x\n", 
+
+//		System.out.printf("sntpTimestamp: %x, espTickCount: %x, pkgLength: %x, uart_int_raw=%x, uart_int_st=%x\n",
 //						sntpTimestamp,espTickCount,pkgLength, uart_int_raw, uart_int_st);
 	}
 
@@ -148,10 +148,10 @@ public class EMSSyslog {
 	final protected static char[] HEXARRAY = "0123456789ABCDEF".toCharArray();
 
 	// convenience...
-	
+
 	static final int EMSPKG_HEADERV1_SIZE = 10; // Timestamp, ESP Ticker, telegram size
 	static final int EMSPKG_HEADER_SIZE = 14;   // 55AA, Timestamp, ESP Ticker, telegram size
-	
+
 	static final int EMSPKG_EOD_SIZE = 4; // crc, brk, 0xe51a
 	static final int EMSPKG_MIN_SIZE = 3; // minimum size we'll care about
 
@@ -427,7 +427,9 @@ public class EMSSyslog {
 	}
 
 	/*
-	 * args[1]: EMS-ESP-Link Gateway args[2]: Syslog-Server
+	 * args[1]: EMS-ESP-Link Gateway
+	 * args[2]: Syslog-Server
+	 * args[3]: tag
 	 */
 
     public static void main(String args[])
@@ -475,8 +477,8 @@ public class EMSSyslog {
                         int brennerStart = 0xffffff & bb.getInt(13);
                         int betriebsDauer = 0xffffff & bb.getInt(16);
                         int heizDauer = 0xffffff & bb.getInt(22);
-                        syslog.notice(String.format("UBAMonitorSlow: %c%3d.%1d %3d.%1d %3d.%1d %2d%c %6d %6d:%02d %6d:%02d\n", new Object[] {
-							tAussen > 0 ? '+' : '-',
+                        syslog.notice(String.format("UBAMonitorSlow: %c%d.%1d %3d.%1d %3d.%1d %2d%c %6d %6d:%02d %6d:%02d\n", new Object[] {
+							tAussen < 0 ? '-' : '+',
                             Integer.valueOf(Math.abs(tAussen) / 10), Integer.valueOf(Math.abs(tAussen) % 10),
                             Integer.valueOf(tKessel / 10), Integer.valueOf(tKessel % 10),
                             Integer.valueOf(tAbgas / 10), Integer.valueOf(tAbgas % 10),
