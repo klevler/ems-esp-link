@@ -158,8 +158,8 @@ static void ICACHE_FLASH_ATTR syslog_chk_status(void)
       }
   } else {
     if ((wifi_status == STATION_WRONG_PASSWORD ||
-	 wifi_status == STATION_NO_AP_FOUND ||
-	 wifi_status == STATION_CONNECT_FAIL)) {
+         wifi_status == STATION_NO_AP_FOUND ||
+         wifi_status == STATION_CONNECT_FAIL)) {
       syslog_set_status(SYSLOG_ERROR);
       os_printf("*** connect failure %d!!!\n", wifi_status);
     } else {
@@ -276,7 +276,7 @@ void ICACHE_FLASH_ATTR syslog_init(char *syslog_host)
       if (syslog_espconn->proto.udp) {
         // there's no counterpart to espconn_create...
         os_free(syslog_espconn->proto.udp);
-	  }
+      }
       os_free(syslog_espconn);
     }
     syslog_espconn = NULL;
@@ -418,16 +418,17 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
 		    tp->tm_year + 1900, tp->tm_mon + 1, tp->tm_mday,
         tp->tm_hour, tp->tm_min, tp->tm_sec);
     if (realtime_stamp == 0)
-      p += os_sprintf(p, ".%06luZ ", sl.se.tick % 1000000);
+      p += os_sprintf(p, ".%06uZ ", se->tick % 1000000);
     else
       p += os_sprintf(p, "%+03d:00 ", flashConfig.timezone_offset);
   }
 
   // add HOSTNAME APP-NAME PROCID MSGID
   if (flashConfig.syslog_showtick)
-    p += os_sprintf(p, "%s %s %lu.%06lu %lu ", flashConfig.hostname, tag, sl.se.tick / 1000000, sl.se.tick % 1000000, syslog_msgid++);
+    p += os_sprintf(p, "%s %s %u.%06u %u ", flashConfig.hostname, tag, se->tick / 1000000,
+        se->tick % 1000000, syslog_msgid++);
   else
-    p += os_sprintf(p, "%s %s - %lu ", flashConfig.hostname, tag, syslog_msgid++);
+    p += os_sprintf(p, "%s %s - %u ", flashConfig.hostname, tag, syslog_msgid++);
 
   // append syslog message
   va_list arglist;
