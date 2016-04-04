@@ -158,8 +158,8 @@ static void ICACHE_FLASH_ATTR syslog_chk_status(void)
       }
   } else {
     if ((wifi_status == STATION_WRONG_PASSWORD ||
-         wifi_status == STATION_NO_AP_FOUND ||
-         wifi_status == STATION_CONNECT_FAIL)) {
+	 wifi_status == STATION_NO_AP_FOUND ||
+	 wifi_status == STATION_CONNECT_FAIL)) {
       syslog_set_status(SYSLOG_ERROR);
       os_printf("*** connect failure %d!!!\n", wifi_status);
     } else {
@@ -236,12 +236,10 @@ static void ICACHE_FLASH_ATTR syslog_gethostbyname_cb(const char *name, ip_addr_
 {
   DBG("[%uµs] %s\n", WDEV_NOW(), __FUNCTION__);
   struct espconn *pespconn = (struct espconn *)arg;
-  if (pespconn != NULL) {
-    // espconn not longer required
-    if (pespconn->proto.udp) 
-      os_free(pespconn->proto.udp);
-    os_free(pespconn);
-  }
+  // espconn not longer required
+  os_free(pespconn->proto.udp);
+  os_free(pespconn);
+
   if (ipaddr != NULL) {
 
     syslog(SYSLOG_FAC_USER, SYSLOG_PRIO_NOTICE, "SYSLOG",
@@ -278,7 +276,7 @@ void ICACHE_FLASH_ATTR syslog_init(char *syslog_host)
       if (syslog_espconn->proto.udp) {
         // there's no counterpart to espconn_create...
         os_free(syslog_espconn->proto.udp);
-      }
+	  }
       os_free(syslog_espconn);
     }
     syslog_espconn = NULL;
@@ -393,9 +391,11 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
   } sl;
 
   DBG("[%dµs] %s id=%lu\n", WDEV_NOW(), __FUNCTION__, syslog_msgid);
-  char *p = (char *)&sl.se.datagram;
-  sl.se.tick = WDEV_NOW();			// 0 ... 4294.967295s
+
+  sl.se.next = NULL;
   sl.se.msgid = syslog_msgid;
+  sl.se.tick = WDEV_NOW();			// 0 ... 4294.967295s
+  char *p = sl.se.datagram;			//
 
   // The Priority value is calculated by first multiplying the Facility
   // number by 8 and then adding the numerical value of the Severity.
@@ -425,8 +425,7 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
 
   // add HOSTNAME APP-NAME PROCID MSGID
   if (flashConfig.syslog_showtick)
-    p += os_sprintf(p, "%s %s %u.%06u %u ", flashConfig.hostname, tag, sl.se.tick / 1000000,
-        sl.se.tick % 1000000, syslog_msgid++);
+    p += os_sprintf(p, "%s %s %u.%06u %u ", flashConfig.hostname, tag, sl.se.tick / 1000000, sl.se.tick % 1000000, syslog_msgid++);
   else
     p += os_sprintf(p, "%s %s - %u ", flashConfig.hostname, tag, syslog_msgid++);
 
@@ -446,12 +445,12 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
   * FunctionName : syslog
   * Description  : compose and queue a new syslog message
   * Parameters   : facility
-  * 				severity
-  * 				tag
-  * 				message
-  * 				...
+  * 		   severity
+  * 		   tag
+  * 		   message
+  * 		   ...
   *
-  *	  SYSLOG-MSG      = HEADER SP STRUCTURED-DATA [SP MSG]
+      SYSLOG-MSG      = HEADER SP STRUCTURED-DATA [SP MSG]
 
       HEADER          = PRI VERSION SP TIMESTAMP SP HOSTNAME
                         SP APP-NAME SP PROCID SP MSGID
@@ -507,9 +506,9 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
       *
   * TIMESTAMP:	realtime_clock == 0 ? timertick / 10⁶ : realtime_clock
   * HOSTNAME	hostname
-  * APPNAME:	ems-esp-link
-  * PROCID:		timertick
-  * MSGID:		NILVALUE
+  * APPNAME:	esp-link
+  * PROCID:	timertick
+  * MSGID:	NILVALUE
   *
   * Returns      : none
  *******************************************************************************/
@@ -528,7 +527,9 @@ void ICACHE_FLASH_ATTR syslog(uint8_t facility, uint8_t severity, const char *ta
   // compose the syslog message
   void *arg = __builtin_apply_args();
   void *res = __builtin_apply((void*)syslog_compose, arg, 128);
-  if (res == NULL) return; // compose failed, probably due to malloc failure
+  if (res == NULL)
+	return; // compose failed, probably due to malloc failure
+
   syslog_entry_t *se  = *(syslog_entry_t **)res;
 
   // and append it to the message queue
