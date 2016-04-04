@@ -9,9 +9,9 @@
 #include "cmd.h"
 
 #ifdef REST_DBG
-#define DBG(format, ...) os_printf(format, ## __VA_ARGS__)
+#define DBG_REST(format, ...) os_printf(format, ## __VA_ARGS__)
 #else
-#define DBG(format, ...) do { } while(0)
+#define DBG_REST(format, ...) do { } while(0)
 #endif
 
 typedef enum {
@@ -93,7 +93,7 @@ tcpclient_recv(void *arg, char *pdata, unsigned short len) {
 
   // collect body and send it
   int body_len = len-pi;
-  DBG("REST: status=%d, body=%d\n", code, body_len);
+  DBG_REST("REST: status=%d, body=%d\n", code, body_len);
   if (pi == len) {
     cmdResponseStart(CMD_RESP_CB, client->resp_cb, 1);
     cmdResponseBody(&code, sizeof(code));
@@ -120,7 +120,7 @@ static void ICACHE_FLASH_ATTR
 tcpclient_sent_cb(void *arg) {
   struct espconn *pCon = (struct espconn *)arg;
   RestClient* client = (RestClient *)pCon->reverse;
-  DBG("REST: Sent\n");
+  DBG_REST("REST: Sent\n");
   if (client->data_sent != client->data_len) {
     // we only sent part of the buffer, send the rest
     espconn_sent(client->pCon, (uint8_t*)(client->data+client->data_sent),
@@ -156,13 +156,13 @@ static void ICACHE_FLASH_ATTR
 tcpclient_connect_cb(void *arg) {
   struct espconn *pCon = (struct espconn *)arg;
   RestClient* client = (RestClient *)pCon->reverse;
-  DBG("REST #%d: connected\n", client-restClient);
+  DBG_REST("REST #%d: connected\n", client-restClient);
   espconn_regist_disconcb(client->pCon, tcpclient_discon_cb);
   espconn_regist_recvcb(client->pCon, tcpclient_recv);
   espconn_regist_sentcb(client->pCon, tcpclient_sent_cb);
 
   client->data_sent = client->data_len <= 1400 ? client->data_len : 1400;
-  DBG("REST #%d: sending %d\n", client-restClient, client->data_sent);
+  DBG_REST("REST #%d: sending %d\n", client-restClient, client->data_sent);
   //if(client->security){
   //  espconn_secure_sent(client->pCon, client->data, client->data_sent);
   //}
@@ -180,7 +180,7 @@ rest_dns_found(const char *name, ip_addr_t *ipaddr, void *arg) {
     os_printf("REST DNS: Got no ip, try to reconnect\n");
     return;
   }
-  DBG("REST DNS: found ip %d.%d.%d.%d\n",
+  DBG_REST("REST DNS: found ip %d.%d.%d.%d\n",
       *((uint8 *) &ipaddr->addr),
       *((uint8 *) &ipaddr->addr + 1),
       *((uint8 *) &ipaddr->addr + 2),
@@ -193,7 +193,7 @@ rest_dns_found(const char *name, ip_addr_t *ipaddr, void *arg) {
     } else
 #endif
     espconn_connect(client->pCon);
-    DBG("REST: connecting...\n");
+    DBG_REST("REST: connecting...\n");
   }
 }
 
@@ -316,7 +316,7 @@ REST_SetHeader(CmdPacket *cmd) {
     client->header[len] = '\r';
     client->header[len+1] = '\n';
     client->header[len+2] = 0;
-    DBG("REST: Set header: %s\r\n", client->header);
+    DBG_REST("REST: Set header: %s\r\n", client->header);
     break;
   case HEADER_CONTENT_TYPE:
     if(client->content_type) os_free(client->content_type);
@@ -325,7 +325,7 @@ REST_SetHeader(CmdPacket *cmd) {
     client->content_type[len] = '\r';
     client->content_type[len+1] = '\n';
     client->content_type[len+2] = 0;
-    DBG("REST: Set content_type: %s\r\n", client->content_type);
+    DBG_REST("REST: Set content_type: %s\r\n", client->content_type);
     break;
   case HEADER_USER_AGENT:
     if(client->user_agent) os_free(client->user_agent);
@@ -334,7 +334,7 @@ REST_SetHeader(CmdPacket *cmd) {
     client->user_agent[len] = '\r';
     client->user_agent[len+1] = '\n';
     client->user_agent[len+2] = 0;
-    DBG("REST: Set user_agent: %s\r\n", client->user_agent);
+    DBG_REST("REST: Set user_agent: %s\r\n", client->user_agent);
     break;
   }
 }
@@ -343,7 +343,7 @@ void ICACHE_FLASH_ATTR
 REST_Request(CmdPacket *cmd) {
   CmdRequest req;
   cmdRequest(&req, cmd);
-  DBG("REST: request");
+  DBG_REST("REST: request");
   if (cmd->argc != 2 && cmd->argc != 3) return;
 
   // Get client
@@ -357,7 +357,7 @@ REST_Request(CmdPacket *cmd) {
   char method[16];
   cmdPopArg(&req, method, len);
   method[len] = 0;
-  DBG(" method=%s", method);
+  DBG_REST(" method=%s", method);
 
   // Get HTTP path
   len = cmdArgLen(&req);
@@ -365,7 +365,7 @@ REST_Request(CmdPacket *cmd) {
   char path[1024];
   cmdPopArg(&req, path, len);
   path[len] = 0;
-  DBG(" path=%s", path);
+  DBG_REST(" path=%s", path);
 
   // Get HTTP body
   uint32_t realLen = 0;
@@ -390,20 +390,20 @@ REST_Request(CmdPacket *cmd) {
                     "User-Agent: %s\r\n\r\n";
   uint16_t headerLen = strlen(headerFmt) + strlen(method) + strlen(path) + strlen(client->host) +
       strlen(client->header) + strlen(client->content_type) + strlen(client->user_agent);
-  DBG(" hdrLen=%d", headerLen);
+  DBG_REST(" hdrLen=%d", headerLen);
   if (client->data) os_free(client->data);
   client->data = (char*)os_zalloc(headerLen + realLen);
   if (client->data == NULL) goto fail;
   DBG_REST(" totLen=%d data=%p", headerLen + realLen, client->data);
   client->data_len = os_sprintf((char*)client->data, headerFmt, method, path, client->host,
       client->header, realLen, client->content_type, client->user_agent);
-  DBG(" hdrLen=%d", client->data_len);
+  DBG_REST(" hdrLen=%d", client->data_len);
 
   if (realLen > 0) {
     cmdPopArg(&req, client->data + client->data_len, realLen);
     client->data_len += realLen;
   }
-  DBG("\n");
+  DBG_REST("\n");
 
   //DBG("REST request: %s", (char*)client->data);
 
@@ -428,5 +428,5 @@ REST_Request(CmdPacket *cmd) {
   return;
 
 fail:
-  DBG("\n");
+  DBG_REST("\n");
 }
