@@ -236,10 +236,12 @@ static void ICACHE_FLASH_ATTR syslog_gethostbyname_cb(const char *name, ip_addr_
 {
   DBG("[%uµs] %s\n", WDEV_NOW(), __FUNCTION__);
   struct espconn *pespconn = (struct espconn *)arg;
-  // espconn not longer required
-  os_free(pespconn->proto.udp);
-  os_free(pespconn);
-
+  if (pespconn != NULL) {
+    // espconn not longer required
+    if (pespconn->proto.udp) 
+      os_free(pespconn->proto.udp);
+    os_free(pespconn);
+  }
   if (ipaddr != NULL) {
 
     syslog(SYSLOG_FAC_USER, SYSLOG_PRIO_NOTICE, "SYSLOG",
@@ -391,11 +393,9 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
   } sl;
 
   DBG("[%dµs] %s id=%lu\n", WDEV_NOW(), __FUNCTION__, syslog_msgid);
-  syslog_entry_t *se = os_zalloc(sizeof (syslog_entry_t) + 1024);	// allow up to 1k datagram
-  if (se == NULL) return NULL;
-  char *p = se->datagram;
-  se->tick = WDEV_NOW();			// 0 ... 4294.967295s
-  se->msgid = syslog_msgid;
+  char *p = (char *)&sl.se.datagram;
+  sl.se.tick = WDEV_NOW();			// 0 ... 4294.967295s
+  sl.se.msgid = syslog_msgid;
 
   // The Priority value is calculated by first multiplying the Facility
   // number by 8 and then adding the numerical value of the Severity.
@@ -418,15 +418,15 @@ syslog_compose(uint8_t facility, uint8_t severity, const char *tag, const char *
 		    tp->tm_year + 1900, tp->tm_mon + 1, tp->tm_mday,
         tp->tm_hour, tp->tm_min, tp->tm_sec);
     if (realtime_stamp == 0)
-      p += os_sprintf(p, ".%06uZ ", se->tick % 1000000);
+      p += os_sprintf(p, ".%06uZ ", sl.se.tick % 1000000);
     else
       p += os_sprintf(p, "%+03d:00 ", flashConfig.timezone_offset);
   }
 
   // add HOSTNAME APP-NAME PROCID MSGID
   if (flashConfig.syslog_showtick)
-    p += os_sprintf(p, "%s %s %u.%06u %u ", flashConfig.hostname, tag, se->tick / 1000000,
-        se->tick % 1000000, syslog_msgid++);
+    p += os_sprintf(p, "%s %s %u.%06u %u ", flashConfig.hostname, tag, sl.se.tick / 1000000,
+        sl.se.tick % 1000000, syslog_msgid++);
   else
     p += os_sprintf(p, "%s %s - %u ", flashConfig.hostname, tag, syslog_msgid++);
 
